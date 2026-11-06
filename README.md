@@ -4,13 +4,15 @@
 
 ## 启动
 
-本机依赖已安装，在项目目录执行：
+先安装 Node.js（包含 npm；本项目已在 Node.js 24.16.0 验证）。Clone 仓库后，在仓库所在的上级目录打开终端，执行：
 
 ```powershell
+cd ForgeFront
+npm ci
 npm run dev -- --host 127.0.0.1 --port 5180
 ```
 
-打开终端显示的本地地址，通常为 http://127.0.0.1:5180/ 。不要直接双击 `index.html`。
+浏览器打开 http://127.0.0.1:5180/ 即可游戏。首次需要安装依赖，以后在项目目录只需运行最后一条命令。运行时保持终端开启，按 `Ctrl+C` 关闭服务；不要直接双击 `index.html`。无需后端或数据库。
 
 ```powershell
 npm test
