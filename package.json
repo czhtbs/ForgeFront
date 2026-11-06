@@ -1,13 +1,14 @@
 {
   "name": "forgefront",
   "version": "1.0.0",
-  "description": "",
+  "description": "ForgeFront single-player browser strategy game",
   "main": "index.js",
   "scripts": {
-    "test": "node --test --test-isolation=none",
+    "test": "node --experimental-strip-types --test --test-isolation=none",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "probe": "node --experimental-strip-types src/debug/probe.ts"
   },
   "keywords": [],
   "author": "",

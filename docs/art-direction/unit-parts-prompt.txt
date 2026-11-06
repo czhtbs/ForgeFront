@@ -1,0 +1,4 @@
+Transparent game sprite sheet, 4 columns × 2 rows of equal cells, one centered isolated part per cell with generous padding. Bright military green and slate gray, crisp outlined cartoon style. Strict overhead view, facing right. Top row: headless soldier torso with arms but no gun or feet; helmet; armored backpack; twin fuel tank backpack. Bottom row: machine gun; long sniper rifle; thick rocket launcher; short flamethrower. All guns point right. No text, labels, grid lines, shadows, scenery or animation.
+
+Revision:
+Correct this game sprite sheet to a TRUE BIRD'S-EYE VIEW, camera vertically above, like top-down RTS soldiers. Torso must show shoulders and upper arms seen from above, facing RIGHT, with no head, feet or weapon. Helmet is seen from above. Backpacks seen from above. Weapons remain horizontal pointing right. Keep transparent background and exact 4-column × 2-row layout, same eight parts in same order, centered with padding. No text.
