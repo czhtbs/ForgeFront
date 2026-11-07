@@ -5,10 +5,12 @@ export const MOVE_SPEED = 12;
 export const polygonArea = (points: Point[]) => Math.abs(points.reduce((sum, a, i) => { const b = points[(i + 1) % points.length]; return sum + a.x * b.y - b.x * a.y; }, 0)) / 2;
 export function battleFrame(p: Province) {
   // Province shape must not resize soldiers or weapon reach during a continuous march.
-  const scale = .2;
-  return { x: p.x - 450 * scale, y: p.y - 300 * scale, scale };
+  const scale = .12;
+  return { x: p.x - FORT.x * scale, y: p.y - FORT.y * scale, scale };
 }
-export const SOLDIER_SIZE = 9;
+export const SOLDIER_SIZE = 2.7;
+export const BATTLE_SPACING = SOLDIER_SIZE * 1.2;
+export const buildingWidth = (p: Province) => p.building === 'hq' ? 36 : p.building ? 32 : 22;
 export const troopSize = (_p: Province) => SOLDIER_SIZE;
 export const fortPosition = (p: Province): Point => { const f = battleFrame(p); return { x: f.x + FORT.x * f.scale, y: f.y + FORT.y * f.scale }; };
 export const toBattle = (p: Province, point: Point): Point => { const f = battleFrame(p); return { x: (point.x - f.x) / f.scale, y: (point.y - f.y) / f.scale }; };

@@ -1,0 +1,29 @@
+[
+  {
+    "pack": "top-down-shooter",
+    "original_file_count": 601,
+    "kept_files": [
+      "License.txt",
+      "Spritesheet/spritesheet_characters.png",
+      "Spritesheet/spritesheet_characters.xml",
+      "Vector/vector_characters.svg"
+    ]
+  },
+  {
+    "pack": "particle-pack",
+    "original_file_count": 195,
+    "kept_files": [
+      "License.txt",
+      "PNG (Transparent)/fire_01.png",
+      "PNG (Transparent)/flame_01.png",
+      "PNG (Transparent)/light_01.png",
+      "PNG (Transparent)/muzzle_01.png",
+      "PNG (Transparent)/scorch_01.png",
+      "PNG (Transparent)/smoke_01.png",
+      "PNG (Transparent)/smoke_04.png",
+      "PNG (Transparent)/spark_01.png",
+      "PNG (Transparent)/spark_05.png",
+      "PNG (Transparent)/trace_01.png"
+    ]
+  }
+]

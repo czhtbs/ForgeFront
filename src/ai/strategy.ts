@@ -1,6 +1,6 @@
 import { canFight } from '../content/equipment.ts';
 import type { World } from '../sim/types.ts';
-import { build, connect, dispatch, retreat, upgrade, configuredItems } from '../sim/world.ts';
+import { build, connect, dispatch, retreat, upgrade, configuredItems, setFactoryOutput } from '../sim/world.ts';
 import { shortestPath, movementPath } from '../sim/map.ts';
 export function runAI(w: World, owner: number) {
   const faction = w.factions[owner], land = w.provinces.filter(p => p.owner === owner);
@@ -17,7 +17,7 @@ export function runAI(w: World, owner: number) {
   if (empty.length && faction.gold > 180) {
     const location = empty.find(p => front.includes(p)) ?? empty[0];
     build(w, location.id, factories.length < Math.ceil(barracks.length / 2) ? 'workshop' : land.filter(p => p.building === 'mine').length < Math.ceil(land.length / 5) ? 'mine' : 'barracks', owner);
-    if (location.building === 'workshop') location.output = ['mg', 'sniper', 'rocket', 'flame'][factories.length % 4] as 'mg';
+    if (location.building === 'workshop') setFactoryOutput(w, location.id, ['mg', 'sniper', 'rocket', 'flame'][factories.length % 4] as 'mg', owner);
   }
   for (const barracks of land.filter(p => ['hq', 'barracks'].includes(p.building ?? '') && !configuredItems(w, p.id).length)) {
     const source = factories.map(p => ({ p, path: shortestPath(w.provinces, p.id, barracks.id, owner) })).filter(x => x.path.length).sort((a, b) => a.path.length - b.path.length)[0];

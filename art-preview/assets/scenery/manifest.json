@@ -1,0 +1,287 @@
+{
+  "hq": {
+    "sheet": "buildings-reference.png",
+    "crop": [
+      30,
+      112,
+      502,
+      494
+    ],
+    "trim": [
+      23,
+      0,
+      453,
+      376
+    ],
+    "size": [
+      430,
+      376
+    ]
+  },
+  "barracks": {
+    "sheet": "buildings-reference.png",
+    "crop": [
+      536,
+      180,
+      985,
+      493
+    ],
+    "trim": [
+      16,
+      17,
+      448,
+      300
+    ],
+    "size": [
+      432,
+      283
+    ]
+  },
+  "workshop": {
+    "sheet": "buildings-reference.png",
+    "crop": [
+      1038,
+      117,
+      1503,
+      495
+    ],
+    "trim": [
+      16,
+      15,
+      453,
+      369
+    ],
+    "size": [
+      437,
+      354
+    ]
+  },
+  "mine": {
+    "sheet": "buildings-reference.png",
+    "crop": [
+      35,
+      575,
+      495,
+      925
+    ],
+    "trim": [
+      21,
+      8,
+      436,
+      345
+    ],
+    "size": [
+      415,
+      337
+    ]
+  },
+  "fort": {
+    "sheet": "buildings-reference.png",
+    "crop": [
+      570,
+      594,
+      985,
+      929
+    ],
+    "trim": [
+      20,
+      28,
+      387,
+      320
+    ],
+    "size": [
+      367,
+      292
+    ]
+  },
+  "round-fort": {
+    "sheet": "buildings-reference.png",
+    "crop": [
+      1055,
+      601,
+      1500,
+      933
+    ],
+    "trim": [
+      28,
+      12,
+      401,
+      321
+    ],
+    "size": [
+      373,
+      309
+    ]
+  },
+  "peak": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      31,
+      143,
+      477,
+      335
+    ],
+    "trim": [
+      50,
+      20,
+      384,
+      192
+    ],
+    "size": [
+      334,
+      172
+    ]
+  },
+  "ridge": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      498,
+      175,
+      1009,
+      331
+    ],
+    "trim": [
+      0,
+      10,
+      511,
+      145
+    ],
+    "size": [
+      511,
+      135
+    ]
+  },
+  "mountains": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      1022,
+      97,
+      1515,
+      336
+    ],
+    "trim": [
+      0,
+      9,
+      493,
+      239
+    ],
+    "size": [
+      493,
+      230
+    ]
+  },
+  "hills": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      24,
+      424,
+      497,
+      615
+    ],
+    "trim": [
+      0,
+      24,
+      465,
+      182
+    ],
+    "size": [
+      465,
+      158
+    ]
+  },
+  "rocks": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      518,
+      420,
+      1007,
+      615
+    ],
+    "trim": [
+      20,
+      16,
+      412,
+      189
+    ],
+    "size": [
+      392,
+      173
+    ]
+  },
+  "pines": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      1019,
+      383,
+      1517,
+      615
+    ],
+    "trim": [
+      12,
+      13,
+      463,
+      232
+    ],
+    "size": [
+      451,
+      219
+    ]
+  },
+  "trees": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      15,
+      692,
+      496,
+      946
+    ],
+    "trim": [
+      19,
+      20,
+      445,
+      243
+    ],
+    "size": [
+      426,
+      223
+    ]
+  },
+  "coast": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      507,
+      714,
+      1014,
+      949
+    ],
+    "trim": [
+      1,
+      0,
+      484,
+      228
+    ],
+    "size": [
+      483,
+      228
+    ]
+  },
+  "stream": {
+    "sheet": "terrain-reference.png",
+    "crop": [
+      1027,
+      721,
+      1517,
+      951
+    ],
+    "trim": [
+      0,
+      4,
+      476,
+      213
+    ],
+    "size": [
+      476,
+      209
+    ]
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "date": "2026-11-07",
+  "scope": "UI/art study only; game framework accepted by user; no gameplay or production assets changed",
+  "assets": [
+    {
+      "id": "shooter",
+      "name": "Kenney · Top-down Shooter",
+      "url": "https://kenney.nl/assets/top-down-shooter",
+      "license": "CC0",
+      "version": "网页 1.0 / 2016；下载包名称 Topdown (Shooter) Pack",
+      "formats": "PNG 图集、独立 PNG、SVG",
+      "preview": "asset-shooter.png",
+      "checked": "已下载并查看角色图集；确认两个 SVG 源文件与 License.txt。",
+      "use": "最适合 A/B：正俯视人物、武器轮廓、箱桶和地表小物件。",
+      "limit": "角色图集中不少是整身持枪姿态，不能直接套入当前身体/武器分离接口；需拆分和补齐机枪、狙击枪、火箭筒、喷火器。",
+      "status": "Character files retained; map / terrain assets removed"
+    },
+    {
+      "id": "tower",
+      "name": "Kenney · Tower Defense (Top-Down)",
+      "url": "https://kenney.nl/assets/tower-defense-top-down",
+      "license": "CC0",
+      "version": "网页 1.0 / 2016",
+      "formats": "PNG 图集、SVG",
+      "preview": "samples/tower-defense-top-down/Preview.png",
+      "checked": "已下载、查看预览，确认 1472×832 图集、SVG 和许可。",
+      "use": "最适合 A：草地、树冠、道路、石块、炮台轮廓与弹道素材。",
+      "limit": "瓦片不能替换不规则地块逻辑；应作为地块内部纹理和装饰。包内车辆不代表本轮新增车辆玩法。",
+      "status": "Rejected by user; downloaded files removed 2026-11-07"
+    },
+    {
+      "id": "battle",
+      "name": "Kenney · Tiny Battle",
+      "url": "https://kenney.nl/assets/tiny-battle",
+      "license": "CC0",
+      "version": "1.0 / 2023",
+      "formats": "16×16 PNG，图集与独立瓦片",
+      "preview": "asset-battle.png",
+      "checked": "已下载、查看预览；packed 图集 288×176，许可随包保留。",
+      "use": "最适合 C：同一风格的军事建筑、步兵、旗帜、地形、指令箭头。",
+      "limit": "人物偏斜俯视、种类和动作有限；不宜任意旋转。像素路线需要统一采样、缩放和朝向方案，不应与高清人物直接混搭。",
+      "status": "Rejected by user; downloaded files removed 2026-11-07"
+    },
+    {
+      "id": "particle",
+      "name": "Kenney · Particle Pack",
+      "url": "https://kenney.nl/assets/particle-pack",
+      "license": "CC0",
+      "version": "网页记 1.0 / 2018；实际包许可写 1.1",
+      "formats": "512×512 透明 PNG 等",
+      "preview": "asset-particles.png",
+      "checked": "已下载，检查许可与贴图；保留枪口、火焰、烟尘、火花、灼痕等十张样本。",
+      "use": "优先用于 A/B：枪口闪光、命中火花、爆炸烟尘、毒气范围、据点受击。",
+      "limit": "是粒子纹理，不是完成的动画；仍需设定发射、时长、尺寸与数量。C 应制作像素化风格一致的特效。"
+    },
+    {
+      "id": "ui",
+      "name": "Kenney · UI Pack",
+      "url": "https://kenney.nl/assets/ui-pack",
+      "license": "CC0",
+      "version": "2.0 / 2024",
+      "formats": "PNG、SVG，附字体与音效",
+      "preview": "asset-ui.png",
+      "checked": "已下载并核对许可；保留四种 SVG 按钮样本。",
+      "use": "按钮状态、面板和控件比例可参考；通用小图标可复用。",
+      "limit": "原皮肤偏休闲蓝色，不能整套搬入军事 UI；现有 HTML/CSS 面板建议按定稿重绘。附带字体不作为中文字体方案。",
+      "status": "Rejected by user; downloaded files removed 2026-11-07"
+    },
+    {
+      "id": "icons",
+      "name": "Game-icons · SVG 图标库",
+      "url": "https://github.com/game-icons/icons",
+      "license": "多数 CC BY 3.0；部分作者为 CC0，逐项核对",
+      "version": "检索日期 2026-11-07，仓库 master",
+      "formats": "SVG",
+      "preview": "samples/game-icons/lorc/poison-gas.svg",
+      "checked": "已核对仓库许可并下载 Lorc 的 poison-gas.svg；其他候选未逐个验收。",
+      "use": "装备模块、毒气、压制、供给异常等语义图标。",
+      "limit": "需要记录实际作者、许可与修改；统一描边、底板和颜色。复杂图案在小尺寸需简化。"
+    },
+    {
+      "id": "warservant",
+      "name": "Tatermand · Top-Down: Soldier v0.7",
+      "url": "https://opengameart.org/content/top-down-soldier-v07",
+      "license": "页面标 CC BY-SA 3.0；署名说明存在不一致",
+      "version": "v0.7 / 2019，作者称 alpha",
+      "formats": "拆分 PNG；页面另提供 PSD",
+      "preview": "samples/warservant/Top-down upper part/Top-down chest.png",
+      "checked": "已下载 ZIP 并查看胸甲、武器；确有头盔、肩部、手臂、腿部分层。未下载 PSD。",
+      "use": "适合作为分层方式与重装轮廓的参考，列为备选。",
+      "limit": "暗色科幻风不易融入当前地图，缺少完整多武器套装；正式采用前应澄清授权说明。",
+      "status": "Removed from active preview: incorrect assembled pose; original parts retained for reference"
+    }
+  ],
+  "references": [
+    {
+      "name": "The Battle of Polytopia",
+      "url": "https://store.steampowered.com/app/874390/The_Battle_of_Polytopia/",
+      "preview": "reference-polytopia.jpg",
+      "imageSource": "https://cdn.akamai.steamstatic.com/steam/apps/2350830/ss_39846fb13a66e7a4b68ade539a90d2a63dbc5777.1920x1080.jpg",
+      "observation": "已查看发行方 Steam 截图：资源集中于顶端，少量全局入口在底部，地形和阵营轮廓承担主要表达。借鉴地图优先与符号化，不采用方格、回合制和 3D 镜头。"
+    },
+    {
+      "name": "Into the Breach",
+      "url": "https://store.steampowered.com/app/590380/Into_the_Breach/",
+      "preview": "reference-itb.jpg",
+      "imageSource": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/590380/ss_6113590509c195f98fa64cd738df534762e0c358.1920x1080.jpg",
+      "observation": "已查看发行方 Steam 截图：深色边框、紧凑状态、攻击方向与高亮目标十分明确。借鉴信息优先级和像素轮廓，不增加回合结束、撤销和伤害预言功能。"
+    },
+    {
+      "name": "OpenRA / Red Alert",
+      "url": "https://www.openra.net/about/",
+      "preview": "reference-openra-ui.png",
+      "imageSource": "https://raw.githubusercontent.com/PortsMaster/PortMaster-New/main/ports/openra/screenshot.png",
+      "observation": "已查看官方画面及 PortMaster 的完整 UI 截图：侧栏分类、资源区、地图与操作区有稳定分工。借鉴分组与扫描顺序，不照搬手动训练队列、雷达和电力系统。"
+    },
+    {
+      "name": "Beyond All Reason",
+      "url": "https://www.beyondallreason.info/",
+      "preview": "reference-bar.png",
+      "imageSource": "https://cdn.prod.website-files.com/5c68622246b367adf6f3041d/67c8d23cc7505aa1d3561643_BAR_strategies_web2.avif",
+      "observation": "已查看官网的战场标记展示：远景用单位符号、数量和军令线保持可读。该图不是完整 HUD 验收；仅借鉴战略标记，避免把所有路径与射程同时铺满地图。"
+    }
+  ],
+  "extraCandidates": [
+    {
+      "url": "https://kenney-assets.itch.io/top-down-tanks-redux",
+      "status": "官方 itch 页面及 CC0 已核对；未下载，作为道路、树木和未来车辆素材备选。"
+    },
+    {
+      "url": "https://github.com/Calinou/kenney-particle-pack",
+      "status": "GitHub 包装版已核对来源与 CC0，面向 Godot；本项目应只取原始 PNG，不引入 Godot 插件。"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ForgeFront · 素材实机预览</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <header class="preview-header"><div><span class="eyebrow">FORGEFRONT / ART LAB</span><h1>素材实机预览</h1></div><p>独立视觉演示 · 按模块逐套检查</p></header>
+  <nav class="modules" aria-label="预览模块"><button data-module="army" aria-pressed="true">1 军队与武器</button><button data-module="ui" aria-pressed="false">2 游戏 UI</button><button data-module="map" aria-pressed="false">3 地图与建筑</button></nav>
+  <main>
+    <section class="controls" aria-label="预览设置">
+      <div class="candidate"><button id="previous" aria-label="上一套素材">←</button><label>素材候选<select id="candidate"></select></label><button id="next" aria-label="下一套素材">→</button><span id="counter"></span></div>
+      <div id="army-controls" class="options">
+        <label>检查内容<select id="inspection"><option value="pose">持握与遮挡</option><option value="four">上 / 下 / 左 / 右</option><option value="impact">子弹命中</option></select></label>
+        <label>武器<select id="weapon"><option value="all">全部并排</option><option value="none">未装备</option><option value="rifle">步枪</option><option value="mg">机枪</option><option value="sniper">狙击枪</option><option value="rocket">火箭筒</option><option value="flame">喷火器</option></select></label>
+        <label>动作<select id="motion"><option value="fire">开火</option><option value="move">移动</option><option value="rotate">转向</option><option value="idle">静止</option></select></label>
+        <label>小队尺寸<select id="scale"><option value="1">1× · 9px</option><option value="2" selected>2× · 18px</option><option value="4">4× · 36px</option></select></label>
+        <label>命中目标<select id="target"><option value="soldier">人体</option><option value="armor">装甲</option><option value="ground">地面</option></select></label>
+        <label class="inline"><input id="guides" type="checkbox">标出握点</label>
+        <label class="inline"><input id="dark-ground" type="checkbox" checked>深色背景</label>
+      </div>
+      <div id="ui-controls" class="options" hidden><label>兵营状态<select id="status"><option value="normal">正常装配</option><option value="cut">供给中断</option><option value="conflict">装备冲突</option><option value="full">生成满员</option></select></label><label>效果图标<select id="effect"><option value="pierce">穿透 · 字符标记</option><option value="gas">毒气 · 下载图标</option></select></label><button id="select-barracks">选中兵营</button><button id="reset-ui">重置样例</button></div>
+      <div id="map-controls" class="options" hidden><label>地图缩放 <output id="map-zoom">100%</output><input id="map-scale" type="range" min="0.75" max="3" step="0.05" value="1"></label><label>步兵尺寸<select id="soldier-size"><option value="1">10px · 原比例</option><option value="1.4">14px · 放大对照</option><option value="1.8">18px · 放大对照</option></select></label><label class="inline"><input id="infantry" type="checkbox" checked>显示步兵</label><label class="inline"><input id="animate-map" type="checkbox" checked>行军与交火</label><label class="inline"><input id="boundaries" type="checkbox" checked>领土与补给线</label><button id="reset-map">全图</button></div>
+      <button id="show-source">查看本套原始素材</button>
+    </section>
+    <p id="description" class="description"></p>
+    <section id="stage" class="stage" aria-label="实时预览画面"><canvas id="preview" aria-label="实时人物、武器和地图"></canvas>
+      <div id="game-ui" class="theme-b" hidden>
+        <div class="game-top"><strong>铸造前线</strong><span>黄金 <b id="gold">860</b></span><span>总人数 <b>128</b></span><span class="game-clock">08:24</span><button id="overview">全图</button><button id="menu-button">菜单</button></div>
+        <section id="inspector" aria-label="当前建筑详情">
+          <div class="building-summary"><img id="building-icon" alt="选中建筑"><div><small>当前选择</small><h2 id="building-title">兵营</h2><span id="level">等级 2</span></div><button id="close-inspector" aria-label="关闭详情">×</button></div>
+          <div id="building-content"></div>
+        </section>
+        <div id="ui-toast" role="status" hidden></div>
+        <div id="demo-menu" hidden><h2>预览菜单</h2><p>这里展示菜单的层级和按钮状态。</p><button id="resume">返回画面</button></div>
+      </div>
+    </section>
+    <p id="stage-hint" class="hint"></p>
+    <section id="building-strip" hidden aria-label="建筑轮廓对照"><h2>建筑轮廓对照</h2><canvas id="buildings" aria-label="五种建筑并排预览"></canvas></section>
+    <section class="credits"><span id="credit"></span><span>这些是运行中的素材试放，不是最终美术或正式对局。</span></section>
+  </main>
+  <dialog id="source-dialog"><header><h2>原始素材与全部候选</h2><button id="close-source">关闭</button></header><p id="source-note"></p><div id="source-images"></div></dialog>
+  <div id="loading" role="status">正在加载本地素材…</div>
+  <script type="module" src="preview.js"></script>
+</body></html>

@@ -1,9 +1,9 @@
 export const WEAPONS = {
-  rifle: { name: '基础步枪', range: 450, damage: 9, interval: .85, speed: 440 },
-  mg: { name: '机枪', range: 540, damage: 7, interval: .25, speed: 500 },
-  sniper: { name: '狙击枪', range: 810, damage: 38, interval: 2.2, speed: 700 },
-  rocket: { name: '火箭筒', range: 675, damage: 27, interval: 2.6, speed: 210 },
-  flame: { name: '火焰喷射器', range: 225, damage: 6, interval: .2, speed: 300 },
+  rifle: { name: '基础步枪', range: 270, damage: 9, interval: .85, speed: 440 },
+  mg: { name: '机枪', range: 324, damage: 7, interval: .25, speed: 500 },
+  sniper: { name: '狙击枪', range: 486, damage: 38, interval: 2.2, speed: 700 },
+  rocket: { name: '火箭筒', range: 405, damage: 27, interval: 2.6, speed: 210 },
+  flame: { name: '火焰喷射器', range: 135, damage: 6, interval: .2, speed: 300 },
 } as const;
 export const EFFECTS = { pierce: { name: '穿透' }, blast: { name: '爆炸' }, gas: { name: '毒气' }, split: { name: '分裂' } } as const;
 export type Weapon = keyof typeof WEAPONS;
@@ -28,4 +28,9 @@ export const equipmentKey = (s: Loadout) => [s.weapon, ...[...s.effects].sort()]
 export const equipmentName = (s: Loadout) => [WEAPONS[s.weapon].name, ...s.effects.map(e => EFFECTS[e].name)].join(' · ');
 
 export const canFight = (s: Loadout & { recruit?: boolean; equipped?: boolean }) => !s.recruit || !!s.equipped;
+export function canEquip(s: Loadout & { recruit?: boolean; equipped?: boolean }, item: Item) {
+  if (!s.recruit) return false;
+  if (item in WEAPONS) return !s.equipped && !validateLoadout({ weapon: item as Weapon, effects: s.effects });
+  return !s.effects.includes(item as Effect) && !validateLoadout({ weapon: s.weapon, effects: [...s.effects, item as Effect] });
+}
 export const unitKey = (s: Loadout & { recruit?: boolean; equipped?: boolean }) => `${s.recruit ? 'recruit' : 'army'}:${canFight(s) ? equipmentKey(s) : 'unarmed'}`;

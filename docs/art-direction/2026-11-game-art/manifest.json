@@ -1,0 +1,41 @@
+{
+  "generator": "built-in image_gen",
+  "reference": "https://www.nintendo.co.jp/n08/bgwj/download/index.html",
+  "assets": [
+    {
+      "name": "hq",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-cf3830d5-3115-44f8-9424-54141735416a.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. One compact military headquarters with a distinctive TALL central square command tower with cyan observation windows, short cream concrete wings, a large visible roof radar dish and single antenna. Strong vertical tower silhouette with blue-gray roof, unmistakable command center. Only one building."
+    },
+    {
+      "name": "barracks",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-86788120-9323-43c3-8640-2e60a897ded0.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. One low elongated olive canvas military barracks QUONSET HUT, semi-cylindrical ribbed roof, wide dark arched doorway at lower right, modest red-orange training pennant by door. No tower, no chimney, no radar. Very simple low arched silhouette unmistakable troop barracks."
+    },
+    {
+      "name": "workshop",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-33fc0fc7-c60c-4b09-b20f-4038603ad551.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. One compact angular factory with a SAWTOOTH SHED ROOF, TWO bold orange-brick smokestacks without smoke, huge dark garage opening facing lower right, yellow-orange industrial hoist mounted at the opening. Dark slate blue metal roof. Industrial machinery silhouette, no radar or tent."
+    },
+    {
+      "name": "mine",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-6e12ee99-f9c2-40cd-ac15-86b570f77b3d.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. One compact gold mining SHAFT HEADFRAME: tall ochre timber A-frame with a big visible winding wheel, dark mine entrance directly under it, a short rail and one tiny ore cart containing bright gold nuggets. No conventional house, no factory shed, no mountain backdrop. Gold and dark timber distinctive silhouette."
+    },
+    {
+      "name": "pine",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-a0c21e42-fb78-400a-b47d-7c8f4e9d951c.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. Exactly ONE small individual pine tree, dark desaturated forest green triangular tiered foliage and short visible brown trunk. No second tree, no cluster, no base platform. Compact crown. Stylized simplified forest tree sprite."
+    },
+    {
+      "name": "tree",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-47a82cd8-29a9-4aec-97c8-ac1458dfee3a.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. Exactly ONE small individual deciduous tree, round irregular crown of muted sage olive leaves with three broad shading masses and short brown trunk. No second tree, no cluster, no ground. Compact simple tree sprite."
+    },
+    {
+      "name": "mountain",
+      "path": "C:\\Users\\simu2\\.codex\\generated_images\\01a1b4b3-9b78-70c3-ae51-15000b3c0028\\exec-f4fbd567-be2b-4fe5-87f6-4af3854c396e.png",
+      "prompt": "Use case: stylized-concept. Asset type: one isolated production-ready 2D RTS game sprite, genuine transparent background. A single object centered with 10% transparent padding, no text, no UI, no tile, no scenery, no ground platform or large cast shadow. Muted olive military gray, hand-painted pixel-informed crisp block shading, readable at 48 pixels wide, simple silhouette and large material regions, minimal tiny detail. Orthographic high top-down 3/4 camera about 65 degrees above ground, north at top, light from upper left. Consistent subdued B-style military strategy aesthetic, no photorealism. Exactly ONE small individual rocky mountain peak, asymmetrical angular gray-beige rock with two simple shaded faces and a tiny pale upper ridge, wider than tall, no additional peak, no mountain range, no snowfield, no surrounding ground. Low saturation so it does not distract from buildings."
+    }
+  ]
+}

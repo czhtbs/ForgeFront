@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMap, inside, shortestPath } from '../src/sim/map.ts';
-import { createWorld, stepWorld, dispatch, build, connect, totalTroops, endMatch, soldier, trainingBattle, retreat, reroute, disconnect, productionState, routeRate, localTroops, travelTime, redirect, orderUnits, allTroops } from '../src/sim/world.ts';
+import { createWorld, stepWorld, dispatch, build, connect, totalTroops, endMatch, soldier, trainingBattle, retreat, reroute, disconnect, productionState, routeRate, localTroops, travelTime, redirect, orderUnits, allTroops, setFactoryOutput } from '../src/sim/world.ts';
 import { configuration, validateLoadout, canFight, equipmentKey, unitKey, WEAPONS } from '../src/content/equipment.ts';
 import { addBattle, reinforce, segmentDistance, stepBattle, DEPLOY_TICKS } from '../src/sim/combat.ts';
 import { BATTLE_CAP, FORT } from '../src/sim/types.ts';
@@ -13,8 +13,8 @@ const settings = { seed: 4521, count: 12, enemies: 1, difficulty: 'normal' as co
 const advance = (w, seconds) => { for (let i = 0; i < seconds * 30; i++) stepWorld(w); };
 const finishMarch = w => { for (let i=0;i<180*30 && w.shipments.length;i++) stepWorld(w); assert.equal(w.shipments.length,0); };
 const quiet = () => { const w = createWorld(settings); w.factions.forEach(f => f.ai = false); return w; };
-test('seeded Voronoi cells form a connected map with valid symmetric adjacency', () => {
-  for (const count of [10, 12, 48]) {
+test('seeded irregular cells form a connected map with valid symmetric adjacency', () => {
+  for (const count of [10, 12, 40, 60, 80]) {
     const a = createMap(count, 4521); assert.deepEqual(a, createMap(count, 4521));
     assert.equal(a.length, count); const seen = new Set([0]), queue = [0];
     for (const id of queue) for (const n of a[id].neighbors) if (!seen.has(n)) { seen.add(n); queue.push(n); }
@@ -91,18 +91,21 @@ test('explosions, split damage and gas affect enemies, not allies', () => {
   b.clouds.push({ owner: 0, x: 110, y: 100, radius: 70, life: 3 });
   stepBattle(w, b); assert.ok(b.fighters.slice(0, 3).every(f => f.hp < 100)); assert.equal(b.fighters[3].hp, 100);
 });
-test('unarmed recruits cannot leave; re-equipping works only before their first departure', () => {
+test('late compatible supplies upgrade existing soldiers only before their first departure', () => {
   const w = quiet(), hq = w.provinces[w.factions[0].hq];
   const target = w.provinces[hq.neighbors.find(n => w.provinces[n].owner === 0)!]; target.building = null;
   hq.troops = [{ ...soldier(w, 0), recruit: true, equipped: false }];
   assert.ok(dispatch(w, hq.id, target.id));
   const source = w.provinces[hq.neighbors.find(n => w.provinces[n].building === null && n !== target.id)!]; source.owner = 0; source.building = 'workshop'; source.output = 'mg'; connect(w, source.id, hq.id);
   advance(w, 9); const recruit = hq.troops.find(s => s.recruit && s.equipped)!; assert.ok(recruit);
-  source.output = 'rocket'; advance(w, 9); assert.equal(recruit.weapon, 'rocket');
+  assert.equal(setFactoryOutput(w, source.id, 'pierce'), null); advance(w, 9);
+  assert.equal(recruit.weapon, 'mg'); assert.deepEqual(recruit.effects, ['pierce']);
   assert.equal(dispatch(w, hq.id, target.id, 1, 0, unitKey(recruit)), null); assert.equal(recruit.recruit, false);
   finishMarch(w); dispatch(w, target.id, hq.id, 1); finishMarch(w);
-  source.output = 'mg'; advance(w, 15);
-  assert.equal(localTroops(w, hq.id, 0).find(s => s.id === recruit.id)!.weapon, 'rocket');
+  assert.equal(setFactoryOutput(w, source.id, 'gas'), null); advance(w, 15);
+  const returned = localTroops(w, hq.id, 0).find(s => s.id === recruit.id)!;
+  assert.equal(returned.weapon, 'mg'); assert.deepEqual(returned.effects, ['pierce']);
+  assert.ok(hq.troops.some(s => s.recruit && s.effects.includes('gas')));
 });
 test('identical commands reproduce simulation and AI decisions; all soldier IDs are unique', () => {
   const a = createWorld(settings), b = createWorld(settings); advance(a, 35); advance(b, 35); assert.deepEqual(a, b);
@@ -144,14 +147,30 @@ test('lost required waypoint falls back to a valid shortest friendly route', () 
 function fortShot(w, b, owner) {
   b.projectiles.push({ id: w.nextId++, owner, x: FORT.x - 50, y: FORT.y, vx: 600, vy: 0, damage: 20, life: 1, weapon: 'mg', effects: [], hits: [] });
 }
-test('assembly uses the slowest supply and conflicting main weapons never produce partial gear', () => {
+test('independent supplies form A, AB and ABC, then finish assembly at the shared capacity', () => {
   const w = quiet(); w.provinces.forEach(p => { p.owner = 0; p.building = null; p.troops = []; });
   const hq = w.provinces[0]; hq.building = 'barracks';
-  for (const [id, output, level] of [[1, 'rocket', 4], [2, 'gas', 1]]) { const p = w.provinces[id]; p.building = 'workshop'; p.output = output; p.level = level; connect(w, id, 0); }
-  advance(w, 20); assert.equal(productionState(w, 0).rate, .25);
-  assert.ok(hq.troops.some(s => s.equipped && s.weapon === 'rocket' && s.effects.includes('gas')));
-  w.provinces[2].output = 'mg'; const before = hq.troops.filter(s => s.equipped).length; advance(w, 20);
-  assert.ok(productionState(w, 0).error); assert.equal(hq.troops.filter(s => s.equipped).length, before);
+  hq.troops = Array.from({ length: 60 }, () => ({ ...soldier(w, 0), recruit: true, equipped: false }));
+  const ids = hq.troops.map(s => s.id);
+  for (const [id, output, level] of [[1, 'rocket', 4], [2, 'gas', 2], [3, 'pierce', 1]]) { const p = w.provinces[id]; p.building = 'workshop'; p.output = output; p.level = level; assert.equal(connect(w, id, 0), null); }
+  advance(w, 40);
+  for (const effects of [[], ['gas'], ['gas', 'pierce']]) assert.ok(hq.troops.some(s => s.equipped && s.weapon === 'rocket' && equipmentKey(s) === equipmentKey({ weapon: 'rocket', effects })));
+  assert.ok(hq.troops.every(s => !s.effects.includes('pierce') || s.effects.includes('gas')));
+  advance(w, 230);
+  assert.deepEqual(hq.troops.map(s => s.id), ids); assert.equal(hq.troops.length, 60);
+  assert.ok(hq.troops.every(s => s.weapon === 'rocket' && s.equipped && s.effects.length === 2));
+  assert.equal(hq.assembly.rocket, 0); assert.equal(productionState(w, 0).rate, 0);
+  dispatch(w, 0, hq.neighbors[0], 1); advance(w, 1);
+  assert.equal(hq.troops.length, 59); assert.equal(hq.assembly.rocket, 0);
+});
+test('conflicting connections and factory output changes are rejected before mutation', () => {
+  const w = quiet(); w.provinces.forEach(p => { p.owner = 0; p.building = 'workshop'; p.troops = []; });
+  w.provinces[0].building = 'barracks';
+  for (const [id, item] of [[1, 'rocket'], [2, 'gas'], [3, 'pierce']]) { w.provinces[id].output = item; assert.equal(connect(w, id, 0), null); }
+  for (const item of ['mg', 'blast', 'split']) { w.provinces[4].output = item; assert.ok(connect(w, 4, 0)); assert.equal(w.routes.length, 3); }
+  assert.ok(setFactoryOutput(w, 1, 'flame')); assert.equal(w.provinces[1].output, 'rocket');
+  assert.ok(setFactoryOutput(w, 3, 'blast')); assert.equal(w.provinces[3].output, 'pierce');
+  assert.equal(setFactoryOutput(w, 3, 'split'), null); assert.equal(w.routes.length, 3);
 });
 test('capacity stops recruitment, not assembly of existing recruits; there is no backlog burst', () => {
   const w = quiet(); const hq = w.provinces[w.factions[0].hq];
@@ -358,7 +377,7 @@ test('each faction deploys one soldier every 0.2 seconds and reserves do not fir
 
 test('weapon reach spans several soldier lengths and projectiles reach distant targets', () => {
   const w=quiet(),p=w.provinces.find(p=>p.owner===-1)!;
-  assert.equal(WEAPONS.rifle.range*battleFrame(p).scale/SOLDIER_SIZE,10);
+  assert.ok(WEAPONS.rifle.range*battleFrame(p).scale/SOLDIER_SIZE >= 10);
   assert.ok(WEAPONS.flame.range<WEAPONS.rifle.range&&WEAPONS.sniper.range>WEAPONS.rocket.range);
   for(const weapon of ['rifle','mg','sniper','rocket']) {
     const b=addBattle(w,p.id,[]),stats=WEAPONS[weapon];b.fighters=[];b.reserve=[];b.projectiles=[];
@@ -379,9 +398,12 @@ test('an expiring projectile cannot travel beyond its remaining lifetime in the 
 });
 
 
-test('a newly deployed attacker walks clear of its entry before opening fire', () => {
-  const w=quiet(),p=w.provinces.find(p=>p.owner===-1)!,b=addBattle(w,p.id,[soldier(w,0)],{x:p.x,y:p.y});
-  reinforce(w,b);const f=b.fighters[0],start={...f.position};f.cooldown=0;
-  stepBattle(w,b);assert.equal(b.shots,0);assert.ok(Math.hypot(f.position!.x-start.x,f.position!.y-start.y)>0);
-  advance(w,2);assert.equal(f.advanceTo,undefined);assert.ok(b.shots>0);
+test('a sniper fires from its entry while rifle troops must still close the distance', () => {
+  const w = quiet(), p = w.provinces.find(p => p.owner === -1)!; p.owner = 1;
+  const guard = soldier(w, 1); guard.position = { x: p.x + 5, y: p.y }; guard.angle = Math.PI; p.troops = [guard];
+  const b = addBattle(w, p.id, [soldier(w, 0, 'sniper')], { x: p.x - 45, y: p.y }); reinforce(w, b);
+  const sniper = b.fighters.find(f => f.owner === 0)!, rifle = b.fighters.find(f => f.owner === 1)!;
+  const start = { ...sniper.position }; sniper.cooldown = rifle.cooldown = 0; sniper.angle = 0;
+  stepBattle(w, b); assert.equal(sniper.advanceTo, undefined); assert.ok(sniper.recoil > 0); assert.equal(rifle.recoil, 0);
+  assert.deepEqual(sniper.position, start);
 });

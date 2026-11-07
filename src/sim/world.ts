@@ -1,7 +1,7 @@
-import { configuration, equipmentKey, unitKey, canFight, WEAPONS } from '../content/equipment.ts';
-import type { Item, Loadout, Weapon } from '../content/equipment.ts';
+import { configuration, unitKey, canFight, canEquip, WEAPONS } from '../content/equipment.ts';
+import type { Effect, Item, Loadout, Weapon } from '../content/equipment.ts';
 import { addBattle, stepBattle, queueReinforcements } from './combat.ts';
-import { createMap, distance, inside, movementPath, routePath, shortestPath } from './map.ts';
+import { createMap, distance, inside, movementPath, routePath, shortestPath, mapBounds } from './map.ts';
 import { CAPACITY, FACTION_COLORS, STEP, BATTLE_W, BATTLE_H, FORT } from './types.ts';
 import type { Building, Province, Settings, Soldier, Waypoint, World, Shipment, Point } from './types.ts';
 import { MOVE_SPEED, SOLDIER_SIZE, assignSlots, formation, fortPosition, moveSoldier, marchOffset, toWorld } from './spatial.ts';
@@ -9,11 +9,12 @@ import { runAI } from '../ai/strategy.ts';
 export function message(w: World, text: string) { w.messages.unshift({ time: w.time, text }); w.messages.length = Math.min(40, w.messages.length); }
 export function soldier(w: World, owner: number, weapon: Weapon = 'rifle'): Soldier { return { id: w.nextId++, owner, hp: 100, weapon, effects: [] }; }
 export function createWorld(settings: Settings): World {
-  const w: World = { settings, time: 0, tick: 0, nextId: 1, rng: settings.seed >>> 0, provinces: createMap(settings.count, settings.seed), factions: [], routes: [], shipments: [], battles: [], flows: [], messages: [], winner: null, stats: [], result: null };
+  const w: World = { settings, time: 0, tick: 0, nextId: 1, rng: settings.seed >>> 0, provinces: createMap(settings.count, settings.seed), factions: [], routes: [], shipments: [], battles: [], flows: [], casualties: [], messages: [], winner: null, stats: [], result: null };
   const occupied = new Set<number>();
+  const bounds = mapBounds(w.provinces);
   for (let id = 0; id <= settings.enemies; id++) {
     const angles = [Math.PI * .85, -Math.PI * .15, -Math.PI * .65, Math.PI * .35];
-    const target = { x: 800 + Math.cos(angles[id]) * 610, y: 500 + Math.sin(angles[id]) * 340 };
+    const target = { x: bounds.x + Math.cos(angles[id]) * bounds.width * .4, y: bounds.y + Math.sin(angles[id]) * bounds.height * .4 };
     const hq = w.provinces.filter(p => !occupied.has(p.id) && p.neighbors.some(n => !occupied.has(n))).sort((a, b) => distance(a, target) - distance(b, target))[0];
     const mine = w.provinces[hq.neighbors.find(n => !occupied.has(n))!];
     occupied.add(hq.id); occupied.add(mine.id);
@@ -44,17 +45,19 @@ export function productionState(w: World, id: number) {
   const p = w.provinces[id], config = configuration(configuredItems(w, id));
   const inputs: Partial<Record<Item, number>> = {};
   for (const f of w.flows) if (f.to === id && f.owner === p.owner && f.start <= w.tick && f.end > w.tick) inputs[f.item] = (inputs[f.item] ?? 0) + f.rate;
-  const rate = Math.min((1 + (p.level - 1) * .3) / 3, ...config.items.map(i => inputs[i] ?? 0));
+  const recruits = [...p.troops, ...p.mobile].filter(s => s.owner === p.owner && s.recruit);
+  const pending = Object.fromEntries(config.items.map(item => [item, recruits.filter(s => canEquip(s, item)).length])) as Partial<Record<Item, number>>;
+  const rate = config.error ? 0 : config.items.reduce((n, item) => n + (pending[item] ? inputs[item] ?? 0 : 0), 0);
   const count = localTroops(w, id, p.owner).length;
-  const waiting = localTroops(w, id, p.owner).filter(s => s.recruit && (!s.equipped || equipmentKey(s) !== equipmentKey(config))).length;
-  const status = config.error ?? (config.weapon === 'rifle' ? '等待主武器' : !waiting ? '装配完成' : rate <= 0 ? '缺供给' : '装配中');
-  return { ...config, inputs, rate: status === '装配中' ? rate : 0, count, waiting, status };
+  const waiting = recruits.filter(s => config.items.some(item => canEquip(s, item))).length;
+  const status = config.error ?? (rate > 0 ? '装配中' : waiting ? '缺供给' : config.weapon === 'rifle' ? '等待主武器' : '装配完成');
+  return { ...config, inputs, pending, rate, count, waiting, status };
 }
 export function build(w: World, id: number, building: NonNullable<Building>, owner = 0): string | null {
   const p = w.provinces[id], f = w.factions[owner], cost = building === 'barracks' ? 140 : building === 'workshop' ? 110 : 160;
   if (p.owner !== owner || p.building || building === 'hq' || w.battles.some(b => b.province === id)) return '需要己方未交战的空地块';
   if (!w.settings.training && f.gold < cost) return `需要 ${cost} 黄金`;
-  if (!w.settings.training) f.gold -= cost; p.building = building; p.level = 1; p.production = 0;
+  if (!w.settings.training) f.gold -= cost; p.building = building; p.level = 1; p.assembly = {};
   message(w, `${f.name}在 ${p.name} 开始建设生产设施`); return null;
 }
 export function upgrade(w: World, id: number, owner = 0): string | null {
@@ -63,10 +66,24 @@ export function upgrade(w: World, id: number, owner = 0): string | null {
   if (!w.settings.training && w.factions[owner].gold < cost) return `需要 ${cost} 黄金`;
   if (!w.settings.training) w.factions[owner].gold -= cost; p.level++; return null;
 }
+export function supplyConflict(w: World, from: number, to: number, item = w.provinces[from].output) {
+  const inputs = w.routes.filter(r => r.to === to && r.from !== from && r.owner === w.provinces[to].owner).map(r => w.provinces[r.from].output);
+  return configuration([...inputs, item]).error;
+}
+export function setFactoryOutput(w: World, from: number, item: Item, owner = 0): string | null {
+  const p = w.provinces[from];
+  if (p.owner !== owner || p.building !== 'workshop') return '请选择己方工坊';
+  for (const route of w.routes.filter(r => r.from === from && r.owner === owner)) {
+    const error = supplyConflict(w, from, route.to, item);
+    if (error) return `${w.provinces[route.to].name}：${error}`;
+  }
+  p.output = item; return null;
+}
 export function connect(w: World, from: number, to: number, owner = 0): string | null {
   const a = w.provinces[from], b = w.provinces[to];
-  if (a.owner !== owner || b.owner !== owner || a.building !== 'workshop' || !['hq', 'barracks'].includes(b.building ?? '')) return '请从己方工坊输出端连接己方兵营';
+  if (a.owner !== owner || b.owner !== owner || a.building !== 'workshop' || !['hq', 'barracks'].includes(b.building ?? '')) return '请从己方工坊建筑拖到己方兵营建筑';
   if (w.routes.some(r => r.from === from && r.to === to && r.owner === owner)) return '该路线已存在';
+  const conflict = supplyConflict(w, from, to); if (conflict) return conflict;
   const path = shortestPath(w.provinces, from, to, owner); if (!path.length) return '己方领土间没有连通路线';
   w.routes.push({ id: w.nextId++, owner, from, to, item: a.output, via: [], path, status: 'normal' }); return null;
 }
@@ -142,7 +159,7 @@ export function orderUnits(w: World, ids: number[], target: number, owner = 0): 
   for (const id of marching) { const error = redirect(w, id, target, selected, owner); if (error) errors.push(error); else orders++; }
   return errors.length ? `${orders ? '部分军队已执行；' : ''}${[...new Set(errors)].join('；')}` : orders ? null : '没有可调动的已装备军队';
 }
-export function endMatch(w: World) { w.result ??= w.factions.map(f => ({ troops: totalTroops(w, f.id), land: w.provinces.filter(p => p.owner === f.id).length })); }
+export function endMatch(w: World) { w.result ??= w.factions.map(f => ({ troops: allTroops(w).filter(s => s.owner === f.id && canFight(s)).length, land: w.provinces.filter(p => p.owner === f.id).length })); }
 function defeat(w: World, owner: number) {
   const remaining = w.factions.filter(f => f.alive && f.id !== owner);
   if (!w.settings.training && (owner === 0 || remaining.length === 1)) { endMatch(w); w.winner = remaining[0].id; }
@@ -209,14 +226,21 @@ function production(w: World) {
       if (p.recruitment + 1e-9 >= 1) { p.recruitment = Math.max(0, p.recruitment - 1); const position = fortPosition(p); position.y += 14; p.troops.push({ ...soldier(w, p.owner), recruit: true, equipped: false, position, angle: Math.PI / 2 }); }
     }
     assignSlots(p, [...p.troops, ...p.mobile]);
-    const state = productionState(w, p.id), key = equipmentKey(state);
-    if (key !== p.productionKey || state.rate === 0) p.production = 0;
-    p.productionKey = key;
-    p.production += STEP * state.rate;
-    if (p.production + 1e-9 < 1) continue;
-    p.production = Math.max(0, p.production - 1);
-    const unit = localTroops(w, p.id, p.owner).find(s => s.recruit && (!s.equipped || equipmentKey(s) !== key));
-    if (unit) { unit.weapon = state.weapon; unit.effects = [...state.effects]; unit.equipped = true; }
+    const state = productionState(w, p.id);
+    for (const item of Object.keys(p.assembly) as Item[]) if (!state.items.includes(item)) delete p.assembly[item];
+    if (state.error) { p.assembly = {}; continue; }
+    const items = [...state.items].sort((a, b) => (state.inputs[b] ?? 0) - (state.inputs[a] ?? 0) || Number(b in WEAPONS) - Number(a in WEAPONS));
+    for (const item of items) {
+      const candidates = [...p.troops, ...p.mobile].filter(s => s.owner === p.owner && canEquip(s, item))
+        .sort((a, b) => b.effects.length + Number(!!b.equipped) - a.effects.length - Number(!!a.equipped) || a.id - b.id);
+      if (!candidates.length || !state.inputs[item]) { p.assembly[item] = 0; continue; }
+      const progress = (p.assembly[item] ?? 0) + STEP * state.inputs[item]!, amount = Math.min(candidates.length, Math.floor(progress + 1e-9));
+      for (const unit of candidates.slice(0, amount)) {
+        if (item in WEAPONS) { unit.weapon = item as Weapon; unit.equipped = true; }
+        else { unit.effects.push(item as Effect); unit.effects.sort(); }
+      }
+      p.assembly[item] = amount === candidates.length ? 0 : Math.max(0, progress - amount);
+    }
     if (battle) {
       const ready = [...p.troops, ...p.mobile].filter(s => s.owner === p.owner && canFight(s));
       const ids = new Set(ready.map(s => s.id)); p.troops = p.troops.filter(s => !ids.has(s.id)); p.mobile = p.mobile.filter(s => !ids.has(s.id)); queueReinforcements(w, battle, ready);
@@ -227,6 +251,7 @@ function production(w: World) {
 export function stepWorld(w: World) {
   if (w.winner !== null) return;
   w.tick++; w.time = w.tick * STEP;
+  w.casualties = w.casualties.filter(c => w.time - c.time < 5);
   logistics(w); production(w);
   for (const p of w.provinces) {
     const troops = [...p.troops, ...p.mobile]; assignSlots(p, troops);
@@ -239,9 +264,8 @@ export function stepWorld(w: World) {
     if (p.hp <= 0) {
       const old = p.owner, owner = p.capturedBy, hq = p.building === 'hq';
       p.owner = owner; p.hp = 1000; b.models = false;
-      w.routes = w.routes.filter(r => r.from !== p.id && r.to !== p.id); p.production = 0; p.recruitment = 0;
+      w.routes = w.routes.filter(r => r.from !== p.id && r.to !== p.id); p.assembly = {}; p.recruitment = 0;
       for (const s of [...p.troops, ...p.mobile]) if (s.recruit && !s.equipped) s.owner = owner;
-      p.productionKey = '';
       if (hq) p.building = 'barracks';
       for (const f of b.fighters) { f.target = undefined; f.targetOwner = undefined; }
       if (hq && old >= 0) defeat(w, old);
@@ -262,12 +286,13 @@ export function stepWorld(w: World) {
 }
 export function trainingBattle(w: World, loadout: Loadout, amount = 40) {
   const target = w.factions[1].hq;
-  w.battles = []; w.shipments = []; w.winner = null; w.result = null; w.stats.forEach(s => { s.kills = 0; s.losses = 0; });
+  w.battles = []; w.shipments = []; w.casualties = []; w.winner = null; w.result = null; w.stats.forEach(s => { s.kills = 0; s.losses = 0; });
   const p = w.provinces[target]; p.owner = 1; p.building = null; p.hp = 1000; p.troops = []; p.mobile = [];
   const allies = Array.from({ length: amount }, () => ({ ...soldier(w, 0, loadout.weapon), effects: [...loadout.effects] }));
   const enemies = Array.from({ length: amount }, () => soldier(w, 1, 'mg'));
+  const positions = formation(p, amount * 2).sort((a, b) => a.x - b.x || a.y - b.y);
   for (const [units, direction] of [[allies, -1], [enemies, 1]] as const) units.forEach((unit, i) => {
-    unit.position = { x: p.x + direction * (65 + Math.floor(i / 10) * SOLDIER_SIZE * 1.7), y: p.y + (i % 10 - 4.5) * SOLDIER_SIZE * 1.7 };
+    unit.position = { ...positions[i + (direction === 1 ? amount : 0)] };
     unit.angle = direction === -1 ? 0 : Math.PI;
   });
   addBattle(w, target, [...allies, ...enemies]); return target;
