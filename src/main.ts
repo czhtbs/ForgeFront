@@ -8,7 +8,7 @@ import type { Settings } from './sim/types.ts';
 const scene = new MapScene();
 let accumulator = 0;
 const ui = new GameUI(scene, (settings: Settings) => { const world = createWorld(settings); accumulator = 0; scene.reset(world); ui.bind(world); });
-scene.actions = { select: id => ui.select(id), selectUnits: (ids, additive, province) => ui.selectUnits(ids, additive, province), order: (to, ids) => ui.order(to, ids), connect: (from, to) => ui.report(connect(ui.world, from, to)), waypoint: (route, via) => ui.report(reroute(ui.world, route, via)), remove: route => disconnect(ui.world, route) };
+scene.actions = { select: id => ui.select(id), selectUnits: (ids, additive, province) => ui.selectUnits(ids, additive, province), order: (to, ids) => ui.order(to, ids), bombard: (to, ids, point) => ui.bombard(to, ids, point), connect: (from, to) => ui.report(connect(ui.world, from, to)), waypoint: (route, via) => ui.report(reroute(ui.world, route, via)), remove: route => disconnect(ui.world, route) };
 const game = new Phaser.Game({ type: Phaser.AUTO, parent: 'map', backgroundColor: '#58c8e5', scene: [scene], scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.NO_CENTER }, render: { antialias: true, roundPixels: false }, fps: { target: 60 }, audio: { noAudio: true } });
 // Deliberately memory-only: refreshing or closing the page ends the session.
 const initial = createWorld({ seed: 4521, count: 40, enemies: 1, difficulty: 'normal' }); scene.reset(initial); ui.bind(initial); ui.home();

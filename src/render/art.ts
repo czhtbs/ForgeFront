@@ -4,18 +4,19 @@ import type { Point, Province, Soldier, Casualty } from '../sim/types.ts';
 import { canFight } from '../content/equipment.ts';
 
 export const UNIT_WEAPONS = ['none', 'rifle', 'mg', 'sniper', 'rocket', 'flame'];
-export const EFFECT_PARTS = ['pierce', 'blast', 'gas', 'split'];
 export { buildingWidth } from '../sim/spatial.ts';
-export const unitFrame = (s: Soldier, recoil = 0) => UNIT_WEAPONS.indexOf(canFight(s) ? s.weapon : 'none') * 4 + Math.round(recoil * 3);
+export const spriteWeapon = (s: Pick<Soldier, 'weapon'> & Partial<Pick<Soldier, 'effects' | 'ammo'>>) => !s.weapon || s.weapon === 'hilt' ? 'none' : s.effects?.includes('lob') ? 'rocket' : s.ammo === 'beam' ? 'flame' : 'rifle';
+export const unitFrame = (s: Soldier, recoil = 0) => UNIT_WEAPONS.indexOf(canFight(s) ? spriteWeapon(s) : 'none') * 4 + Math.round(recoil * 3);
 export const appear = (age: number, duration: number) => { const t = Math.max(0, Math.min(1, age / duration)); return t * t * (3 - 2 * t); };
 export const unitDetail = (zoom: number) => appear(SOLDIER_SIZE * zoom - 6, 4);
 export function deathFragments(c: Casualty, age: number) {
   const rand = randomSource(c.id * 417), t = Math.min(.8, age), fade = 1 - appear(age - 3.8, 1.2);
-  const frames = [0, 1, 2 + ['rifle', 'mg', 'sniper', 'rocket', 'flame'].indexOf(c.weapon), ...(c.weapon === 'flame' ? [7] : [])];
+  const weapon = ['rifle', 'mg', 'sniper', 'rocket', 'flame'].indexOf(spriteWeapon(c));
+  const frames = [0, 1, ...(weapon >= 0 ? [2 + weapon] : []), ...(spriteWeapon(c) === 'flame' ? [7] : [])];
   return frames.map((frame, i) => {
     const angle = c.angle + (rand() - .5) * 3.6, reach = SOLDIER_SIZE * (i === 0 ? .37 : .56 + rand() * .74) * c.force;
     const drift = 1 - Math.exp(-t * 5), hop = Math.sin(t / .8 * Math.PI) * SOLDIER_SIZE * (i === 0 ? .15 : .41);
-    return { frame, x: c.x + Math.cos(angle) * reach * drift, y: c.y + Math.sin(angle) * reach * drift - hop, groundY: c.y + Math.sin(angle) * reach * drift, angle: angle + t * (i === 0 ? 1.2 : i % 2 ? 5 : -4), size: SOLDIER_SIZE * (i === 0 ? 1.02 : i === 1 ? .59 : i === 2 ? c.weapon === 'sniper' ? 1.65 : 1.3 : .74), alpha: fade };
+    return { frame, x: c.x + Math.cos(angle) * reach * drift, y: c.y + Math.sin(angle) * reach * drift - hop, groundY: c.y + Math.sin(angle) * reach * drift, angle: angle + t * (i === 0 ? 1.2 : i % 2 ? 5 : -4), size: SOLDIER_SIZE * (i === 0 ? 1.02 : i === 1 ? .59 : i === 2 ? 1.3 : .74), alpha: fade };
   });
 }
 export function revealedLine(points: Point[], progress: number): Point[] {

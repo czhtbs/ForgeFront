@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { createWorld, stepWorld, totalTroops, trainingBattle } from '../sim/world.ts';
 import { reinforce } from '../sim/combat.ts';
-for (const effect of ['pierce', 'gas', 'split'] as const) {
+for (const effect of ['pierce', 'burn', 'split'] as const) {
   const scenario = createWorld({ seed: 4521, count: 10, enemies: 1, difficulty: 'normal', training: true });
-  trainingBattle(scenario, { weapon: 'mg', effects: [effect] }, 160);
+  trainingBattle(scenario, { weapon: 'launcher', ammo: 'round', effects: [effect] }, 160);
   for (const unit of scenario.battles[0].reserve) unit.deployAt = 0;
   reinforce(scenario, scenario.battles[0]);
   assert.equal(scenario.battles[0].fighters.length, 240);

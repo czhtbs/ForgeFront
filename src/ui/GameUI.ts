@@ -1,8 +1,9 @@
-import { ITEMS, itemName, equipmentName, unitKey, canFight } from '../content/equipment.ts';
-import type { Item } from '../content/equipment.ts';
-import { build, connect, dispatch, endMatch, localTroops, productionState, reroute, retreat, trainingBattle, upgrade, disconnect, routeRate, allTroops, orderUnits, setFactoryOutput } from '../sim/world.ts';
+import { WORKSHOP_ITEMS, EFFECTS, isWorkshop, itemName, equipmentName, unitKey, canFight } from '../content/equipment.ts';
+import type { Item, Effect } from '../content/equipment.ts';
+import { build, connect, dispatch, endMatch, localTroops, productionState, reroute, retreat, trainingBattle, upgrade, disconnect, routeRate, allTroops, orderUnits, setFactoryOutput, bombard, ceaseFire } from '../sim/world.ts';
+import { artilleryError } from '../sim/attacks.ts';
 import { BUILDING_NAMES } from '../sim/types.ts';
-import type { Settings, World } from '../sim/types.ts';
+import type { Settings, World, Building, Point } from '../sim/types.ts';
 import { toggleUnits } from './interaction.ts';
 import { MAP_SIZES } from '../sim/map.ts';
 import { ROUTE_COLORS, routeNumber } from '../render/geometry.ts';
@@ -41,7 +42,7 @@ export class GameUI {
       if (!this.active) return;
       if (e.key.toLowerCase() === 'h') this.scene.fit();
       if (e.key === 'F3') { e.preventDefault(); this.debug = !this.debug; }
-      if (e.key === 'Escape') { this.scene.cancelDrag(); this.select(-1); }
+      if (e.key === 'Escape') { this.scene.bombardMode = false; this.scene.cancelDrag(); this.select(-1); }
       if (e.key === 'Delete') this.scene.deleteSelected();
     });
   }
@@ -54,15 +55,19 @@ export class GameUI {
   private setup() {
     document.querySelector('#menu')!.innerHTML = `<div class="menu-card"><h1>开始对局</h1><label>地图<select id="start-count">${MAP_SIZES.map(size => `<option value="${size.count}">${size.name} · ${size.count} 地块</option>`).join('')}</select></label><label>对手<select id="start-enemies"><option value="1">1 名 AI</option><option value="3">3 名 AI</option></select></label><label>难度<select id="start-difficulty"><option value="normal">标准</option><option value="easy">休闲</option><option value="hard">进取</option></select></label><label>种子<input id="start-seed" type="number" value="4521"></label><button class="primary wide" data-action="start">进入战区</button><button class="wide" data-action="home">返回</button></div>`;
   }
-  select(id: number) { this.selected = id; this.scene.selected = id; this.scene.selectedUnits.clear(); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.mode = 'production'; this.render(true); }
+  select(id: number) { this.scene.bombardMode = false; this.selected = id; this.scene.selected = id; this.scene.selectedUnits.clear(); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.mode = 'production'; this.render(true); }
   selectUnits(ids: number[], additive: boolean, province = -1) {
-    this.scene.selectedUnits = toggleUnits(this.scene.selectedUnits, ids, additive);
+    this.scene.bombardMode = false; this.scene.selectedUnits = toggleUnits(this.scene.selectedUnits, ids, additive);
     this.selected = this.scene.selected = this.scene.selectedUnits.size ? province : -1;
     this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true);
   }
   order(target: number, ids: number[]) {
     if (!this.active || this.world.winner !== null) return;
-    this.report(orderUnits(this.world, ids, target)); this.render(true);
+    this.scene.bombardMode = false; this.report(orderUnits(this.world, ids, target)); this.render(true);
+  }
+  bombard(target: number, ids: number[], point: Point) {
+    if (!this.active || this.world.winner !== null) return;
+    this.report(bombard(this.world, ids, target, point)); this.render(true);
   }
   report(error: string | null, success = '指令已执行') { const toast = document.querySelector<HTMLElement>('#toast')!; toast.textContent = error ?? success; toast.className = error ? 'error show' : 'show'; this.toastTimer = performance.now() + 3000; }
   private action(action: string, id?: string) {
@@ -81,13 +86,15 @@ export class GameUI {
     if (action === 'delete-point') { this.scene.deleteSelected(); return; }
     if (action === 'delete-route') { disconnect(this.world, this.scene.selectedRoute); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true); return; }
     if (action === 'reset-route') { this.report(reroute(this.world, this.scene.selectedRoute, [])); return; }
+    if (action === 'bombard') { this.scene.bombardMode = !this.scene.bombardMode; this.render(true); return; }
+    if (action === 'cease-fire') { ceaseFire(this.world, [...this.scene.selectedUnits]); this.scene.bombardMode = false; this.render(true); return; }
     const p = this.world.provinces[this.selected]; if (!p || p.owner !== 0) return;
-    if (action === 'build') this.report(build(this.world, p.id, id as 'barracks' | 'workshop' | 'mine'));
+    if (action === 'build') this.report(build(this.world, p.id, id as NonNullable<Building>));
     if (action === 'upgrade') this.report(upgrade(this.world, p.id));
     if (action === 'tab') this.mode = id as typeof this.mode;
     if (action === 'test') {
       const state = productionState(this.world, p.id);
-      if (state.error || state.weapon === 'rifle') this.report(state.error ?? '先从工坊连入主武器');
+      if (state.error || !canFight(state)) this.report(state.error ?? '先接入兼容的发射器和弹药');
       else { const target = trainingBattle(this.world, state, Number((document.querySelector('#test-count') as HTMLSelectElement).value)); this.scene.focus(target, true); }
     }
     this.render(true);
@@ -123,26 +130,36 @@ export class GameUI {
     if (!force && (this.controlHeld || panel.contains(document.activeElement) && ['INPUT', 'SELECT'].includes(document.activeElement!.tagName))) return;
     const own = p?.owner === 0;
     const title = selected.length ? '选中部队' : p.building ? BUILDING_NAMES[p.building] : '堡垒';
-    let html = `<div class="panel-head"><h2>${title}</h2><button data-action="close" aria-label="取消选择">×</button></div><div class="panel-body">${p && !selected.length && p.building ? `<img class="building-portrait" src="assets/b-style/${p.building}.png" alt="${title}">` : ''}`;
+    let html = `<div class="panel-head"><h2>${title}</h2><button data-action="close" aria-label="取消选择">×</button></div><div class="panel-body">${p && !selected.length && p.building ? `<img class="building-portrait" src="assets/b-style/${isWorkshop(p.building) ? 'workshop' : p.building}.png" alt="${title}">` : ''}`;
     if (selected.length) {
       const groups = new Map<string, typeof selected>();
       for (const s of selected) { const key = `${s.owner}/${unitKey(s)}`, list = groups.get(key) ?? []; list.push(s); groups.set(key, list); }
       html += `<p class="big-number">${selected.length} 人</p>`;
       for (const soldiers of groups.values()) { const first = soldiers[0]; html += `<h3>${esc(equipmentName(first))} · ${soldiers.length} 人</h3><p>${first.recruit ? '驻营士兵 · 可继续补装，也可出发' : '军队 · 装备已固定'}</p>`; }
+      const guns = selected.filter(s => s.owner === 0 && s.effects.includes('lob'));
+      if (guns.length) {
+        html += `<button class="wide ${this.scene.bombardMode ? 'chosen' : ''}" data-action="bombard">${this.scene.bombardMode ? '取消炮击选点' : '炮击：点击地图指定落点'}</button><button class="wide" data-action="cease-fire">停止炮击</button><p class="muted">射程 65–330。近距离受敌压制时停火；移动后取消炮击。</p>`;
+        for (const s of guns.filter(s => s.bombard).slice(0, 1)) {
+          const target = s.effects.includes('homing') && allTroops(w).find(t => t.id === s.bombard!.target && t.hp > 0 && t.owner !== s.owner);
+          html += `<p>${artilleryError(w, s, target ? target.position! : s.bombard!.point) ?? '持续炮击中'} · ${w.provinces[s.bombard!.province].name}</p>`;
+        }
+      }
       const moving = w.shipments.reduce((n, s) => n + s.troops.filter(t => this.scene.selectedUnits.has(t.id)).length, 0);
       if (moving) html += `<p>行军中 ${moving} 人 · 可拖动改道</p>`;
       html += '<p class="muted">Ctrl 点击添加选择，再点同一组取消。拖动任一已选图标，为全部已选军队下令。</p>';
     } else {
       html += `<p class="owner">${p.owner < 0 ? '中立' : w.factions[p.owner].name}</p><div class="stat-line"><span>堡垒</span><b>${Math.ceil(p.hp)} / 1000</b></div><div class="meter"><i style="width:${p.hp / 10}%"></i></div>`;
+      if (p.hp <= 0) html += '<p class="notice">建筑瘫痪，停止产出；脱离攻击 8 秒后自动修复。占领需要地面部队。</p>';
       if (own && p.building && p.building !== 'mine') html += `<div class="tabs"><button class="${this.mode === 'production' ? 'chosen' : ''}" data-action="tab" data-id="production">生产</button><button class="${this.mode === 'building' ? 'chosen' : ''}" data-action="tab" data-id="building">建筑</button></div>`;
-      if (own && !p.building) html += `<button class="wide" data-action="build" data-id="barracks">兵营 <span>140 金</span></button><button class="wide" data-action="build" data-id="workshop">工坊 <span>110 金</span></button><button class="wide" data-action="build" data-id="mine">金矿 <span>160 金</span></button>`;
+      if (own && !p.building) html += `<button class="wide" data-action="build" data-id="barracks">兵营 <span>140 金</span></button>${Object.keys(WORKSHOP_ITEMS).map(kind => `<button class="wide" data-action="build" data-id="${kind}">${BUILDING_NAMES[kind as keyof typeof WORKSHOP_ITEMS]} <span>110 金</span></button>`).join('')}<button class="wide" data-action="build" data-id="mine">金矿 <span>160 金</span></button>`;
       else if (own && (this.mode === 'building' || p.building === 'mine')) html += `<p>建筑等级 ${p.level} / 5</p>${p.building === 'mine' ? `<p>收入 ${(3 + p.level).toFixed(0)} 金/秒</p>` : ''}${p.level < 5 ? `<button class="wide" data-action="upgrade">升级 <span>${p.level * 100} 金</span></button>` : ''}`;
-      else if (own && p.building === 'workshop') {
+      else if (own && isWorkshop(p.building)) {
         const routes = w.routes.filter(r => r.from === p.id && r.owner === 0);
-        html += `<label>产出<select id="factory-output">${ITEMS.map(i => `<option value="${i}" ${p.output === i ? 'selected' : ''}>${itemName(i)}</option>`).join('')}</select></label><p>产能 ${(p.level / 4).toFixed(2)} 件/秒</p><p>${routes.length ? `${routes.length} 条连接 · 各 ${routeRate(w, p.id).toFixed(3)} 件/秒` : '无连接 · 产出浪费'}</p><p class="muted">从地图上的工坊建筑直接拖到兵营建筑。所有连接等分，满员与断线的份额浪费。</p>`;
+        if (p.output in EFFECTS) html += `<p>${EFFECTS[p.output as Effect].description}</p>`;
+        html += `<label>产出<select id="factory-output">${WORKSHOP_ITEMS[p.building].map(i => `<option value="${i}" ${p.output === i ? 'selected' : ''}>${itemName(i)}</option>`).join('')}</select></label><p>产能 ${(p.level / 4).toFixed(2)} 件/秒</p><p>${routes.length ? `${routes.length} 条连接 · 各 ${routeRate(w, p.id).toFixed(3)} 件/秒` : '无连接 · 产出浪费'}</p><p class="muted">从地图上的工坊建筑直接拖到兵营建筑。所有连接等分，满员与断线的份额浪费。</p>`;
       } else if (own && (p.building === 'hq' || p.building === 'barracks')) {
-        const state = productionState(w, p.id), troops = localTroops(w, p.id, 0), naked = troops.filter(s => s.recruit && !s.equipped).length, ready = troops.filter(s => s.recruit && s.equipped).length;
-        html += `<div class="stat-line"><span>本地人数</span><b>${troops.length} / 60</b></div><p>未装备肉人 ${naked} · 可补装士兵 ${ready}<br>固定装备军队 ${troops.filter(s => !s.recruit).length}</p><p class="muted">${troops.length >= 60 ? '满员 · 停止生成肉人，继续补装' : `每 ${(3 / (1 + (p.level - 1) * .3)).toFixed(1)} 秒生成一名肉人`}</p><h3>完整配置目标</h3><p>${state.weapon === 'rifle' ? '尚未接入主武器' : esc(equipmentName(state))}</p><p class="notice ${state.error ? 'error' : ''}">${esc(state.status)}${state.rate ? ` · ${state.rate.toFixed(3)} 件/秒` : ''}</p>${state.items.map(i => `<div class="stat-line"><span>${itemName(i)} · 待装 ${state.pending[i] ?? 0}</span><b>${(state.inputs[i] ?? 0).toFixed(3)} 件/秒</b></div>`).join('')}<p class="muted">各装备独立消耗，优先补齐已有装备的士兵。首次离营后固定配置，返回也不再补装。</p>`;
+        const state = productionState(w, p.id), troops = localTroops(w, p.id, 0), naked = troops.filter(s => s.recruit && !canFight(s)).length, ready = troops.filter(s => s.recruit && canFight(s)).length;
+        html += `<div class="stat-line"><span>本地人数</span><b>${troops.length} / 60</b></div><p>未装备肉人 ${naked} · 可补装士兵 ${ready}<br>固定装备军队 ${troops.filter(s => !s.recruit).length}</p><p class="muted">${troops.length >= 60 ? '满员 · 停止生成肉人，继续补装' : `每 ${(3 / (1 + (p.level - 1) * .3)).toFixed(1)} 秒生成一名肉人`}</p><h3>完整配置目标</h3><p>${!state.weapon && !state.ammo ? '尚未接入发射器和弹药' : esc(equipmentName(state))}</p><p class="notice ${state.error ? 'error' : ''}">${esc(state.status)}${state.rate ? ` · ${state.rate.toFixed(3)} 件/秒` : ''}</p>${state.items.map(i => `<div class="stat-line"><span>${itemName(i)} · 待装 ${state.pending[i] ?? 0}</span><b>${(state.inputs[i] ?? 0).toFixed(3)} 件/秒</b></div>`).join('')}<p class="muted">发射器与弹药都装好才可战斗，后接配件自动补装。各项独立消耗，优先补齐已有装备的士兵。首次离营后固定配置，返回也不再补装。</p>`;
         const groups = new Map<string, typeof troops>();
         for (const s of troops.filter(canFight)) { const key = unitKey(s), list = groups.get(key) ?? []; list.push(s); groups.set(key, list); }
         if (groups.size) html += '<h3>驻留兵种</h3>';

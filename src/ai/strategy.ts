@@ -1,45 +1,51 @@
-import { canFight } from '../content/equipment.ts';
+import { canFight, isWorkshop, configuration, WEAPONS, AMMO } from '../content/equipment.ts';
+import type { Item, Workshop } from '../content/equipment.ts';
 import type { World } from '../sim/types.ts';
-import { build, connect, dispatch, retreat, upgrade, configuredItems, setFactoryOutput } from '../sim/world.ts';
-import { shortestPath, movementPath } from '../sim/map.ts';
+import { build, connect, dispatch, retreat, upgrade, configuredItems, setFactoryOutput, supplyConflict, bombard } from '../sim/world.ts';
+import { shortestPath, movementPath, distance } from '../sim/map.ts';
 export function runAI(w: World, owner: number) {
   const faction = w.factions[owner], land = w.provinces.filter(p => p.owner === owner);
   const front = land.filter(p => p.neighbors.some(n => w.provinces[n].owner !== owner));
   const active = new Set(w.battles.map(b => b.province));
   for (const b of w.battles) {
-    const ours = b.fighters.filter(s => s.owner === owner).length + b.reserve.filter(s => s.owner === owner).length;
-    const enemies = b.fighters.length + b.reserve.length - ours;
-    if (ours > 0 && enemies > ours * 2.5) { const dest = w.provinces[b.province].neighbors.find(n => w.provinces[n].owner === owner && !active.has(n)); if (dest !== undefined) retreat(w, b.province, dest, owner); }
+    const ours = [...b.fighters, ...b.reserve].filter(s => s.owner === owner), enemies = [...b.fighters, ...b.reserve].filter(s => s.owner !== owner);
+    if (ours.length && (enemies.length > ours.length * 2 || ours.every(s => s.effects.includes('lob')) && enemies.length)) {
+      const dest = w.provinces[b.province].neighbors.find(n => w.provinces[n].owner === owner && !active.has(n));
+      if (dest !== undefined) retreat(w, b.province, dest, owner);
+    }
   }
   const barracks = land.filter(p => p.building === 'hq' || p.building === 'barracks');
-  const factories = land.filter(p => p.building === 'workshop');
+  const factories = land.filter(p => isWorkshop(p.building));
   const empty = land.filter(p => !p.building && !active.has(p.id));
-  if (empty.length && faction.gold > 180) {
-    const location = empty.find(p => front.includes(p)) ?? empty[0];
-    build(w, location.id, factories.length < Math.ceil(barracks.length / 2) ? 'workshop' : land.filter(p => p.building === 'mine').length < Math.ceil(land.length / 5) ? 'mine' : 'barracks', owner);
-    if (location.building === 'workshop') setFactoryOutput(w, location.id, ['mg', 'sniper', 'rocket', 'flame'][factories.length % 4] as 'mg', owner);
+  let built = false;
+  for (const [index, home] of barracks.entries()) {
+    const input = configuredItems(w, home.id), config = configuration(input), melee = config.weapon === 'hilt' || config.ammo === 'blade' || !config.weapon && !config.ammo && index % 3 === 1;
+    const wanted: Item[] = [config.weapon ?? (melee ? 'hilt' : 'launcher'), config.ammo ?? (melee ? 'blade' : 'round'), ...(index % 3 === 2 ? ['lob', 'homing', 'blast'] as Item[] : melee ? ['pierce', 'frost'] as Item[] : ['pierce', 'burn'] as Item[])];
+    for (const item of wanted.filter(i => !input.includes(i))) {
+      const source = factories.filter(p => p.output === item && !supplyConflict(w, p.id, home.id)).map(p => ({ p, path: shortestPath(w.provinces, p.id, home.id, owner) })).filter(x => x.path.length).sort((a, b) => a.path.length - b.path.length)[0];
+      if (source) { connect(w, source.p.id, home.id, owner); continue; }
+      if (!built && empty.length && faction.gold >= 110) {
+        const location = empty.shift()!, kind: Workshop = item in WEAPONS ? 'launcherWorks' : item in AMMO ? 'ammoWorks' : 'attachmentWorks';
+        if (!build(w, location.id, kind, owner)) { setFactoryOutput(w, location.id, item, owner); connect(w, location.id, home.id, owner); built = true; }
+      }
+      break;
+    }
   }
-  for (const barracks of land.filter(p => ['hq', 'barracks'].includes(p.building ?? '') && !configuredItems(w, p.id).length)) {
-    const source = factories.map(p => ({ p, path: shortestPath(w.provinces, p.id, barracks.id, owner) })).filter(x => x.path.length).sort((a, b) => a.path.length - b.path.length)[0];
-    if (source) connect(w, source.p.id, barracks.id, owner);
-  }
-  for (const factory of factories) {
-    const targets = barracks.map(p => ({ p, path: shortestPath(w.provinces, factory.id, p.id, owner) })).filter(t => t.path.length && !configuredItems(w, t.p.id).some(i => ['mg', 'sniper', 'rocket', 'flame'].includes(i) && i !== factory.output)).sort((a, b) => a.path.length - b.path.length);
-    if (targets.length && !w.routes.some(r => r.from === factory.id && r.status !== 'cut')) connect(w, factory.id, targets[0].p.id, owner);
-  }
+  if (!built && empty.length && faction.gold > 220) build(w, empty[0].id, land.filter(p => p.building === 'mine').length < Math.ceil(land.length / 5) ? 'mine' : 'barracks', owner);
   for (const p of land) {
     if (active.has(p.id)) continue;
-    const count = [...p.troops, ...p.mobile].filter(canFight).length;
-    const targets = w.provinces.filter(q => { if (q.owner === owner) return false; const path = movementPath(w, p.id, q.id, owner); return path.length > 1 && path.slice(1, -1).every(id => w.provinces[id].owner === owner); }).sort((a, b) => {
-      const score = (q: typeof a) => q.building === 'hq' ? -80 : q.building === 'workshop' ? -45 : q.building === 'mine' ? -30 : q.owner === -1 ? -20 : q.troops.filter(canFight).length;
-      return score(a) - score(b);
-    });
-    if (targets.length && count > 28) {
-      const target = targets.find(t => count > t.troops.filter(canFight).length * 1.15 + 15);
-      if (target) { dispatch(w, p.id, target.id, Math.floor(count * .75), owner); faction.intent = `进攻 ${target.name}`; }
+    const troops = [...p.troops, ...p.mobile].filter(canFight), guns = troops.filter(s => s.effects.includes('lob'));
+    for (const target of w.provinces.filter(q => q.owner !== owner).sort((a, b) => distance(p, a) - distance(p, b))) {
+      if (guns.length && !bombard(w, guns.map(s => s.id), target.id, target, owner)) { faction.intent = `炮击 ${target.name}`; break; }
+    }
+    const ground = troops.filter(s => !s.effects.includes('lob')), count = ground.length;
+    const targets = w.provinces.filter(q => { if (q.owner === owner) return false; const path = movementPath(w, p.id, q.id, owner); return path.length > 1 && path.slice(1, -1).every(id => w.provinces[id].owner === owner); }).sort((a, b) => (a.building === 'hq' ? -100 : a.hp) - (b.building === 'hq' ? -100 : b.hp));
+    if (targets.length && count > 20) {
+      const target = targets.find(t => count > t.troops.filter(canFight).length * 1.15 + 10);
+      if (target) { dispatch(w, p.id, target.id, Math.floor(count * .8), owner, undefined, new Set(ground.map(s => s.id))); faction.intent = `进攻 ${target.name}`; }
     } else if (!targets.length && count > 25 && front.length) {
       const dest = [...front].sort((a, b) => a.troops.length - b.troops.length)[0];
-      dispatch(w, p.id, dest.id, count - 12, owner); faction.intent = `增援 ${dest.name}`;
+      if (dest.id !== p.id) dispatch(w, p.id, dest.id, count - 12, owner, undefined, new Set(ground.map(s => s.id)));
     }
   }
   if (faction.gold > 300) { const p = barracks.find(p => p.level < 3) ?? factories.find(p => p.level < 3); if (p) upgrade(w, p.id, owner); }

@@ -38,7 +38,7 @@ test('single decor sprites, scattered or clustered, stay entirely within their o
 test('supply routes attach to actual buildings and reveal continuously along their length', () => {
   const w = createWorld({ seed: 4521, count: 40, enemies: 1, difficulty: 'normal' });
   const home = w.provinces[w.factions[0].hq], source = w.provinces[home.neighbors[0]];
-  source.owner = 0; source.building = 'workshop'; assert.equal(connect(w, source.id, home.id), null);
+  source.owner = 0; source.building = 'launcherWorks'; assert.equal(connect(w, source.id, home.id), null);
   const points = routeGeometry(w, w.routes[0]).map(v => ({ x: v.point.x, y: v.point.y }));
   assert.deepEqual(points[0], fortPosition(source)); assert.deepEqual(points.at(-1), fortPosition(home));
   assert.deepEqual(revealedLine(points, 1), points);
@@ -60,7 +60,7 @@ test('game consumes new assets and all weapon/effect parts are available', () =>
 test('training deployments also fit the smaller fixed tile at every supported battle size', () => {
   for (const amount of [40, 120, 160]) {
     const w = createWorld({ seed: 4521, count: 10, enemies: 1, difficulty: 'normal', training: true });
-    const id = trainingBattle(w, { weapon: 'mg', effects: [] }, amount), p = w.provinces[id];
+    const id = trainingBattle(w, { weapon: 'launcher', ammo: 'round', effects: [] }, amount), p = w.provinces[id];
     assert.ok(w.battles[0].reserve.every(s => inside(s.position!, p.polygon)));
   }
 });

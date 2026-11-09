@@ -1,8 +1,10 @@
-import { WEAPONS, canFight } from '../content/equipment.ts';
+import { WEAPONS, PAYLOADS, canFight, isWorkshop } from '../content/equipment.ts';
 import { BATTLE_CAP, BATTLE_H, BATTLE_W, STEP, FORT } from './types.ts';
-import type { Battle, Fighter, Point, Projectile, Soldier, World } from './types.ts';
+import type { Battle, Fighter, Point, Soldier, World } from './types.ts';
 import { MOVE_SPEED, battleFrame, BATTLE_SPACING, buildingWidth, assignSlots, formation, toBattle, toWorld, SOLDIER_SIZE } from './spatial.ts';
 import { distance, inside } from './map.ts';
+import { fireAttack, hurt, hurtBuilding } from './attacks.ts';
+export { segmentDistance } from './attacks.ts';
 import { BUILDING_HITS } from '../content/building-hits.ts';
 export const SPLASH_RADIUS = 30;
 export function random(w: World) { w.rng = (Math.imul(w.rng, 1664525) + 1013904223) >>> 0; return w.rng / 4294967296; }
@@ -51,7 +53,7 @@ export function addBattle(w: World, province: number, incoming: Soldier[], entry
   let battle = w.battles.find(b => b.province === province);
   if (!battle) {
     const p = w.provinces[province]; assignSlots(p, [...p.troops, ...p.mobile]);
-    battle = { province, fighters: [], reserve: [], projectiles: [], clouds: [], visuals: [], wave: 0, nextDeploy: [], models: true, shots: 0, losses: w.factions.map(() => 0) };
+    battle = { province, fighters: [], reserve: [], wave: 0, nextDeploy: [], models: true, shots: 0, losses: w.factions.map(() => 0) };
     queueReinforcements(w, battle, [...p.troops, ...p.mobile].filter(canFight));
     p.troops = p.troops.filter(s => !canFight(s)); p.mobile = p.mobile.filter(s => !canFight(s));
     w.battles.push(battle);
@@ -59,38 +61,12 @@ export function addBattle(w: World, province: number, incoming: Soldier[], entry
   queueReinforcements(w, battle, incoming, entry);
   return battle;
 }
-export function segmentDistance(p: Point, a: Point, b: Point) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
-  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
-}
-function impact(w: World, b: Battle, bullet: Projectile, target: Fighter) {
-  target.hitAngle = Math.atan2(bullet.vy ?? 0, bullet.vx ?? 1); target.hitForce = bullet.weapon === 'rocket' || bullet.effects.includes('blast') ? 1.7 : 1;
-  target.hp -= bullet.damage; target.killedBy = bullet.owner; target.suppressed = bullet.weapon === 'mg' ? .35 : target.suppressed;
-  b.visuals.push({ x: target.x, y: target.y, kind: 'hit', life: .12, max: .12, angle: 0 });
-  if (bullet.weapon === 'rocket' || bullet.effects.includes('blast')) {
-    for (const f of b.fighters) if (f.owner !== bullet.owner && f.id !== target.id && distance(f, target) < SPLASH_RADIUS) { f.hp -= bullet.damage * .65; f.killedBy = bullet.owner; f.hitAngle = Math.atan2(f.y - target.y, f.x - target.x); f.hitForce = 1.7; }
-    if (distance(target, FORT) < SPLASH_RADIUS + FORT.radius) hurtFort(w, b, bullet.owner, bullet.damage * .65);
-    b.visuals.push({ x: target.x, y: target.y, kind: 'blast', life: .5, max: .5, angle: 0 });
-  }
-  if (bullet.effects.includes('gas')) b.clouds.push({ x: target.x, y: target.y, owner: bullet.owner, life: 3, radius: SPLASH_RADIUS });
-  if (bullet.effects.includes('split')) {
-    const nearby = b.fighters.filter(f => f.owner !== bullet.owner && f.id !== target.id && distance(f, target) < 90).sort((a, c) => distance(a, target) - distance(c, target)).slice(0, 2);
-    for (const f of nearby) { f.hp -= bullet.damage * .45; f.killedBy = bullet.owner; b.visuals.push({ x: f.x, y: f.y, kind: 'hit', life: .12, max: .12, angle: 0 }); }
-  }
-}
 export function fortAim(w: World, province: number): Point {
-  const p = w.provinces[province], points = BUILDING_HITS[p.building ?? 'fort'], [x, y] = points[Math.floor(random(w) * points.length)], scale = buildingWidth(p) / battleFrame(p).scale;
+  const p = w.provinces[province], points = BUILDING_HITS[isWorkshop(p.building) ? 'workshop' : p.building ?? 'fort'], [x, y] = points[Math.floor(random(w) * points.length)], scale = buildingWidth(p) / battleFrame(p).scale;
   return { x: FORT.x + x * scale, y: FORT.y + y * scale };
 }
-function hurtFort(w: World, b: Battle, owner: number, damage: number, point = fortAim(w, b.province)) {
-  const p = w.provinces[b.province];
-  if (p.owner === owner || p.hp <= 0) return;
-  p.hp -= damage; p.lastHit = w.time; p.capturedBy = owner;
-  b.visuals.push({ ...point, kind: 'fort-hit', life: .28, max: .28, angle: 0 });
-}
 export function stepBattle(w: World, b: Battle) {
-  const dt = STEP, province = w.provinces[b.province], frame = battleFrame(province), spacing = BATTLE_SPACING / frame.scale, muzzle = SOLDIER_SIZE * .75 / frame.scale, hitRadius = SOLDIER_SIZE * .35 / frame.scale;
+  const dt = STEP, province = w.provinces[b.province], frame = battleFrame(province), spacing = BATTLE_SPACING / frame.scale;
   reinforce(w, b);
   const grid = new Map<string, Fighter[]>();
   for (const f of b.fighters) {
@@ -98,9 +74,9 @@ export function stepBattle(w: World, b: Battle) {
     const cell = grid.get(key); if (cell) cell.push(f); else grid.set(key, [f]);
   }
   for (const f of b.fighters) {
-    if (f.hp <= 0) continue;
+    if (f.hp <= 0 || f.frozen! > 0) continue;
     f.cooldown -= dt; f.recoil = Math.max(0, f.recoil - dt * 7); f.suppressed = Math.max(0, f.suppressed - dt);
-    const stats = WEAPONS[f.weapon];
+    const stats = WEAPONS[f.weapon!];
     let target = b.fighters.find(t => t.id === f.target && t.owner !== f.owner && t.hp > 0);
     if (!target) {
       let nearest = Infinity;
@@ -109,8 +85,9 @@ export function stepBattle(w: World, b: Battle) {
       }
     }
     const waitingEnemy = b.reserve.some(s => s.owner !== f.owner && s.hp > 0);
-    const fort = !target && !waitingEnemy && province.owner !== f.owner && province.hp > 0;
+    const fort = !target && !waitingEnemy && province.owner !== f.owner;
     f.target = target?.id ?? (fort ? -1 : undefined); f.targetOwner = fort ? province.owner : undefined;
+    if (f.effects.includes('lob') && !(fort && province.hp <= 0)) { f.position = toWorld(province, f); continue; }
     let advance = f.advanceTo ? toBattle(province, f.advanceTo) : undefined;
     if (advance && (distance(f, advance) <= MOVE_SPEED / frame.scale * dt || (target || fort) && distance(f, target ?? FORT) - (fort ? FORT.radius : 0) <= stats.range)) { f.advanceTo = undefined; advance = undefined; }
     if (!fort) f.fortAim = undefined;
@@ -119,25 +96,21 @@ export function stepBattle(w: World, b: Battle) {
     const nearest = Math.max(0, distance(f, fort && !advance ? FORT : goal) - (fort && !advance ? FORT.radius : 0));
     const aim = fort && !advance ? f.fortAim! : goal, desired = Math.atan2(goal.y - f.y, goal.x - f.x), facing = Math.atan2(aim.y - f.y, aim.x - f.x), delta = Math.atan2(Math.sin(facing - f.angle), Math.cos(facing - f.angle));
     f.angle += Math.max(-dt * 7, Math.min(dt * 7, delta));
-    if ((advance || target || fort) && nearest > (advance ? 0 : stats.range * .9)) {
-      const speed = MOVE_SPEED / frame.scale * (f.suppressed > 0 ? .45 : 1);
+    if ((advance || target || fort) && nearest > (advance ? 0 : fort && province.hp <= 0 ? 50 : stats.range * .9)) {
+      const speed = MOVE_SPEED / frame.scale * (f.suppressed > 0 ? .45 : f.chill! > 0 ? .6 : 1);
       f.x += Math.cos(desired) * speed * dt; f.y += Math.sin(desired) * speed * dt;
     }
     f.position = toWorld(province, f);
-    if (!advance && (target || fort) && nearest <= stats.range && f.cooldown <= 0 && Math.abs(delta) < .4) {
+    if (!advance && (target || fort) && nearest <= stats.range && f.cooldown <= 0 && (f.weapon === 'hilt' || Math.abs(delta) < .4) && !(f.ammo === 'beam' && w.projectiles.some(p => p.source === f.id && p.ammo === 'beam'))) {
       f.cooldown = stats.interval; f.recoil = 1; b.shots++;
-      if (f.weapon === 'flame') {
-        if (fort) hurtFort(w, b, f.owner, stats.damage, f.fortAim);
-        for (const enemy of b.fighters) {
-          const a = Math.atan2(enemy.y - f.y, enemy.x - f.x);
-          if (enemy.owner !== f.owner && distance(f, enemy) <= stats.range && Math.abs(Math.atan2(Math.sin(a - f.angle), Math.cos(a - f.angle))) < .45) impact(w, b, { owner: f.owner, damage: stats.damage, weapon: f.weapon, effects: f.effects } as Projectile, enemy);
+      if (f.weapon === 'hilt') {
+        const amount = stats.damage * (1 + f.effects.filter(e => PAYLOADS.includes(e)).length * .2);
+        if (fort) hurtBuilding(w, province.id, f.owner, amount, toWorld(province, f.fortAim!));
+        else {
+          const enemies = b.fighters.filter(t => t.owner !== f.owner && t.hp > 0 && distance(f, t) <= stats.range).sort((a, b) => Number(b.id === f.target) - Number(a.id === f.target) || distance(f, a) - distance(f, b));
+          enemies.slice(0, f.effects.includes('pierce') ? 3 : 1).forEach((enemy, i) => hurt(w, { unit: enemy, point: toWorld(province, enemy), province: province.id, active: true }, f.owner, amount * .7 ** i, f.position!));
         }
-        b.visuals.push({ x: f.x, y: f.y, angle: f.angle, kind: 'flame', life: .17, max: .17, target: f.fortAim });
-      } else {
-        const angle = fort ? Math.atan2(f.fortAim!.y - f.y, f.fortAim!.x - f.x) : f.angle;
-        const barrel = fort ? Math.min(muzzle, Math.max(0, distance(f, f.fortAim!) - 2)) : muzzle;
-        b.projectiles.push({ id: w.nextId++, x: f.x + Math.cos(angle) * barrel, y: f.y + Math.sin(angle) * barrel, owner: f.owner, vx: Math.cos(angle) * stats.speed, vy: Math.sin(angle) * stats.speed, damage: stats.damage, weapon: f.weapon, effects: [...f.effects], life: ((fort ? distance(f, f.fortAim!) + 2 : stats.range) - barrel) / stats.speed, hits: [], fortTarget: f.fortAim });
-      }
+      } else if (!fort || province.hp > 0) fireAttack(w, f, f.position!, toWorld(province, aim), province.id, target?.id ?? -province.id - 1);
       f.fortAim = undefined;
     }
   }
@@ -160,23 +133,4 @@ export function stepBattle(w: World, b: Battle) {
     }
   }
   for (const f of b.fighters) f.position = toWorld(province, f);
-  for (const p of b.projectiles) {
-    const old = { x: p.x, y: p.y }, travel = Math.min(dt, p.life); p.x += p.vx * travel; p.y += p.vy * travel; p.life -= travel;
-    let stopped = false;
-    const province = w.provinces[b.province];
-    const impactPoint = p.fortTarget ?? FORT, fortRadius = p.fortTarget ? 2 : FORT.radius;
-    const fortHit = province.owner !== p.owner && province.hp > 0 && !p.hits.includes(-1) && segmentDistance(impactPoint, old, p) < fortRadius;
-    const hits = b.fighters.filter(f => f.hp > 0 && f.owner !== p.owner && !p.hits.includes(f.id) && segmentDistance(f, old, p) < hitRadius).sort((a, c) => distance(old, a) - distance(old, c));
-    for (const hit of hits) {
-      if (fortHit && distance(old, impactPoint) - fortRadius < distance(old, hit) - hitRadius) break;
-      impact(w, b, p, hit); p.hits.push(hit.id); if (!p.effects.includes('pierce') || p.hits.length >= 3) { p.life = 0; stopped = true; break; } p.damage *= .7; }
-    if (fortHit && !stopped) { hurtFort(w, b, p.owner, p.damage, p.fortTarget); p.hits.push(-1); p.life = 0; }
-  }
-  b.projectiles = b.projectiles.filter(p => p.life > 0);
-  for (const gas of b.clouds) { gas.life -= dt; for (const f of b.fighters) if (f.owner !== gas.owner && distance(f, gas) < gas.radius) { f.hp -= dt * 5; f.killedBy = gas.owner; } }
-  b.clouds = b.clouds.filter(g => g.life > 0);
-  for (const f of b.fighters) if (f.hp <= 0) { b.losses[f.owner]++; w.stats[f.owner].losses++; if (f.killedBy !== undefined) w.stats[f.killedBy].kills++; w.casualties.push({ ...toWorld(province, f), id: f.id, owner: f.owner, weapon: f.weapon, angle: f.hitAngle ?? f.angle, force: f.hitForce ?? .7, time: w.time }); }
-  b.fighters = b.fighters.filter(f => f.hp > 0);
-  for (const v of b.visuals) v.life -= dt;
-  b.visuals = b.visuals.filter(v => v.life > 0);
 }

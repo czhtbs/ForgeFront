@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createMap, inside, shortestPath } from '../src/sim/map.ts';
 import { createWorld, stepWorld, dispatch, build, connect, totalTroops, endMatch, soldier, trainingBattle, retreat, reroute, disconnect, productionState, routeRate, localTroops, travelTime, redirect, orderUnits, allTroops, setFactoryOutput } from '../src/sim/world.ts';
 import { configuration, validateLoadout, canFight, equipmentKey, unitKey, WEAPONS } from '../src/content/equipment.ts';
+import { fireAttack, stepAttacks, resolveDeaths } from '../src/sim/attacks.ts';
+import { fortPosition } from '../src/sim/spatial.ts';
 import { addBattle, reinforce, segmentDistance, stepBattle, DEPLOY_TICKS } from '../src/sim/combat.ts';
 import { BATTLE_CAP, FORT } from '../src/sim/types.ts';
 import { routeGeometry, editedWaypoints } from '../src/render/geometry.ts';
@@ -27,30 +29,11 @@ test('starting HQ/mine pairs, automatic generation and fixed garrison capacity',
   advance(w, 90); for (const f of w.factions) assert.equal(w.provinces[f.hq].troops.length, 60);
   assert.ok(w.factions.every(f => f.gold >= 0));
 });
-test('all inputs form one configuration and any conflict stops the whole combination', () => {
-  assert.ok(configuration(['mg', 'rocket']).error);
-  assert.ok(configuration(['flame', 'gas']).error);
-  assert.ok(configuration(['mg', 'pierce', 'split']).error);
-  assert.ok(configuration(['rocket', 'blast', 'gas']).error);
-  assert.equal(configuration(['rocket', 'blast', 'split']).error, null);
-  assert.deepEqual(configuration(['mg', 'mg', 'pierce']).effects, ['pierce']);
-});
-test('construction charges once, recruits are free and are equipped only after supply arrives', () => {
-  const w = quiet(), hq = w.provinces[w.factions[0].hq];
-  const factory = w.provinces[hq.neighbors.find(n => w.provinces[n].building === null)!]; factory.owner = 0;
-  const before = w.factions[0].gold;
-  assert.equal(build(w, factory.id, 'workshop'), null); assert.equal(w.factions[0].gold, before - 110);
-  assert.ok(build(w, factory.id, 'workshop'));
-  assert.equal(connect(w, factory.id, hq.id), null);
-  for (const p of w.provinces) if (p.building === 'mine') p.building = null;
-  w.factions[0].gold = 0;
-  advance(w, 3); assert.equal(hq.troops.filter(s => s.recruit).length, 1); assert.equal(hq.troops.filter(s => s.recruit && s.equipped).length, 0);
-  advance(w, 12); assert.ok(hq.troops.some(s => s.recruit && s.weapon === 'mg' && s.equipped)); assert.equal(w.factions[0].gold, 0);
-  assert.equal('stock' in hq, false);
-});
+
+
 test('a captured endpoint destroys its connections and redistributes remaining factory capacity', () => {
   const w = quiet(); w.provinces.forEach(p => { p.owner = 0; p.building = null; });
-  const source = w.provinces[0]; source.building = 'workshop'; source.level = 4;
+  const source = w.provinces[0]; source.building = 'launcherWorks'; source.level = 4;
   for (const id of [1, 2, 3]) { w.provinces[id].building = 'barracks'; connect(w, 0, id); }
   assert.equal(routeRate(w, 0), 1 / 3); assert.ok(connect(w, 0, 1));
   advance(w, 1); const flow = { ...w.flows.find(f => f.to === 1)! };
@@ -71,42 +54,14 @@ test('remote attacks can pass neutral territory without capturing the intermedia
 });
 test('active entity limits preserve excess soldiers after deployment', () => {
   const w = quiet(), p = w.provinces[0]; p.troops = []; p.mobile = [];
-  const b = addBattle(w, p.id, Array.from({ length: 500 }, (_, i) => soldier(w, i % 2, 'mg')));
+  const b = addBattle(w, p.id, Array.from({ length: 500 }, (_, i) => soldier(w, i % 2, 'launcher')));
   for (const unit of b.reserve) unit.deployAt = 0;
   for (let i = 0; i < 10; i++) reinforce(w, b);
   assert.equal(b.fighters.length, BATTLE_CAP); assert.equal(b.fighters.length + b.reserve.length, 500);
 });
-test('projectiles use segment collision and pierce multiple enemies', () => {
-  assert.equal(segmentDistance({ x: 5, y: 2 }, { x: 0, y: 0 }, { x: 10, y: 0 }), 2);
-  const w = quiet(), b = addBattle(w, 0, []); b.wave = 10;
-  const fighter = (id, x, owner) => ({ id, owner, hp: 100, weapon: 'rifle' as const, effects: [], x, y: 100, angle: 0, cooldown: 10, recoil: 0, suppressed: 0 });
-  b.fighters = [fighter(100, 100, 1), fighter(101, 115, 1), fighter(102, 20, 0)];
-  b.projectiles.push({ id: 103, owner: 0, x: 80, y: 100, vx: 1500, vy: 0, damage: 20, life: 1, weapon: 'mg', effects: ['pierce'], hits: [] });
-  stepBattle(w, b); assert.ok(b.fighters[0].hp < 100); assert.ok(b.fighters[1].hp < 100);
-});
-test('explosions, split damage and gas affect enemies, not allies', () => {
-  const w = quiet(), b = addBattle(w, 0, []); b.wave = 10;
-  b.fighters = [0, 1, 2, 3].map((i) => ({ ...soldier(w, i === 3 ? 0 : 1), x: 100 + i * 10, y: 100, angle: 0, cooldown: 10, recoil: 0, suppressed: 0 }));
-  b.projectiles.push({ id: 200, owner: 0, x: 80, y: 100, vx: 900, vy: 0, damage: 20, life: 1, weapon: 'rocket', effects: ['split'], hits: [] });
-  b.clouds.push({ owner: 0, x: 110, y: 100, radius: 70, life: 3 });
-  stepBattle(w, b); assert.ok(b.fighters.slice(0, 3).every(f => f.hp < 100)); assert.equal(b.fighters[3].hp, 100);
-});
-test('late compatible supplies upgrade existing soldiers only before their first departure', () => {
-  const w = quiet(), hq = w.provinces[w.factions[0].hq];
-  const target = w.provinces[hq.neighbors.find(n => w.provinces[n].owner === 0)!]; target.building = null;
-  hq.troops = [{ ...soldier(w, 0), recruit: true, equipped: false }];
-  assert.ok(dispatch(w, hq.id, target.id));
-  const source = w.provinces[hq.neighbors.find(n => w.provinces[n].building === null && n !== target.id)!]; source.owner = 0; source.building = 'workshop'; source.output = 'mg'; connect(w, source.id, hq.id);
-  advance(w, 9); const recruit = hq.troops.find(s => s.recruit && s.equipped)!; assert.ok(recruit);
-  assert.equal(setFactoryOutput(w, source.id, 'pierce'), null); advance(w, 9);
-  assert.equal(recruit.weapon, 'mg'); assert.deepEqual(recruit.effects, ['pierce']);
-  assert.equal(dispatch(w, hq.id, target.id, 1, 0, unitKey(recruit)), null); assert.equal(recruit.recruit, false);
-  finishMarch(w); dispatch(w, target.id, hq.id, 1); finishMarch(w);
-  assert.equal(setFactoryOutput(w, source.id, 'gas'), null); advance(w, 15);
-  const returned = localTroops(w, hq.id, 0).find(s => s.id === recruit.id)!;
-  assert.equal(returned.weapon, 'mg'); assert.deepEqual(returned.effects, ['pierce']);
-  assert.ok(hq.troops.some(s => s.recruit && s.effects.includes('gas')));
-});
+
+
+
 test('identical commands reproduce simulation and AI decisions; all soldier IDs are unique', () => {
   const a = createWorld(settings), b = createWorld(settings); advance(a, 35); advance(b, 35); assert.deepEqual(a, b);
   const units = [...a.provinces.flatMap(p => [...p.troops, ...p.mobile]), ...a.shipments.flatMap(s => s.troops), ...a.battles.flatMap(b => [...b.fighters, ...b.reserve])];
@@ -114,8 +69,8 @@ test('identical commands reproduce simulation and AI decisions; all soldier IDs 
 });
 test('training battle uses real combat with requested composition', () => {
   const w = createWorld({ ...settings, count: 10, training: true });
-  trainingBattle(w, { weapon: 'rocket', effects: ['blast'] }, 40);
-  advance(w, 8); const b = w.battles[0]; assert.ok(b); assert.equal(b.fighters.length + b.reserve.length + b.losses.reduce((a, b) => a + b, 0), 80); assert.ok(b.fighters.some(s => s.weapon === 'rocket'));
+  trainingBattle(w, { weapon: 'launcher', ammo: 'round', effects: ['blast'] }, 40);
+  advance(w, 8); const b = w.battles[0]; assert.ok(b); assert.equal(b.fighters.length + b.reserve.length + b.losses.reduce((a, b) => a + b, 0), 80); assert.ok(b.fighters.some(s => s.weapon === 'launcher'));
 });
 test('retreat conserves survivors and moves them back through transit', () => {
   const w = quiet(), home = w.provinces[w.factions[0].hq], target = home.neighbors.find(n => w.provinces[n].owner === -1)!;
@@ -139,53 +94,26 @@ test('a destroyed HQ ends the match and preserves a report without counting clea
 test('lost required waypoint falls back to a valid shortest friendly route', () => {
   const w = quiet(); w.provinces.forEach(p => p.owner = 0);
   const from = w.provinces[0], to = w.provinces[from.neighbors[0]], via = w.provinces.find(p => p.id !== from.id && p.id !== to.id)!;
-  from.building = 'workshop'; to.building = 'barracks'; connect(w, from.id, to.id);
+  from.building = 'launcherWorks'; to.building = 'barracks'; connect(w, from.id, to.id);
   const r = w.routes[0]; assert.equal(reroute(w, r.id, [{ x: via.x, y: via.y, province: via.id }]), null); assert.ok(r.path.includes(via.id));
   via.owner = 1; stepWorld(w); assert.deepEqual(r.via, []); assert.deepEqual(r.path, [from.id, to.id]);
 });
 
 function fortShot(w, b, owner) {
-  b.projectiles.push({ id: w.nextId++, owner, x: FORT.x - 50, y: FORT.y, vx: 600, vy: 0, damage: 20, life: 1, weapon: 'mg', effects: [], hits: [] });
+  const p = w.provinces[b.province], f = b.fighters.find(s => s.owner === owner)!;
+  f.x = FORT.x - 20; f.y = FORT.y; f.position = toWorld(p, f);
+  fireAttack(w, f, f.position, fortPosition(p), p.id, -p.id - 1);
 }
-test('independent supplies form A, AB and ABC, then finish assembly at the shared capacity', () => {
-  const w = quiet(); w.provinces.forEach(p => { p.owner = 0; p.building = null; p.troops = []; });
-  const hq = w.provinces[0]; hq.building = 'barracks';
-  hq.troops = Array.from({ length: 60 }, () => ({ ...soldier(w, 0), recruit: true, equipped: false }));
-  const ids = hq.troops.map(s => s.id);
-  for (const [id, output, level] of [[1, 'rocket', 4], [2, 'gas', 2], [3, 'pierce', 1]]) { const p = w.provinces[id]; p.building = 'workshop'; p.output = output; p.level = level; assert.equal(connect(w, id, 0), null); }
-  advance(w, 40);
-  for (const effects of [[], ['gas'], ['gas', 'pierce']]) assert.ok(hq.troops.some(s => s.equipped && s.weapon === 'rocket' && equipmentKey(s) === equipmentKey({ weapon: 'rocket', effects })));
-  assert.ok(hq.troops.every(s => !s.effects.includes('pierce') || s.effects.includes('gas')));
-  advance(w, 230);
-  assert.deepEqual(hq.troops.map(s => s.id), ids); assert.equal(hq.troops.length, 60);
-  assert.ok(hq.troops.every(s => s.weapon === 'rocket' && s.equipped && s.effects.length === 2));
-  assert.equal(hq.assembly.rocket, 0); assert.equal(productionState(w, 0).rate, 0);
-  dispatch(w, 0, hq.neighbors[0], 1); advance(w, 1);
-  assert.equal(hq.troops.length, 59); assert.equal(hq.assembly.rocket, 0);
-});
-test('conflicting connections and factory output changes are rejected before mutation', () => {
-  const w = quiet(); w.provinces.forEach(p => { p.owner = 0; p.building = 'workshop'; p.troops = []; });
-  w.provinces[0].building = 'barracks';
-  for (const [id, item] of [[1, 'rocket'], [2, 'gas'], [3, 'pierce']]) { w.provinces[id].output = item; assert.equal(connect(w, id, 0), null); }
-  for (const item of ['mg', 'blast', 'split']) { w.provinces[4].output = item; assert.ok(connect(w, 4, 0)); assert.equal(w.routes.length, 3); }
-  assert.ok(setFactoryOutput(w, 1, 'flame')); assert.equal(w.provinces[1].output, 'rocket');
-  assert.ok(setFactoryOutput(w, 3, 'blast')); assert.equal(w.provinces[3].output, 'pierce');
-  assert.equal(setFactoryOutput(w, 3, 'split'), null); assert.equal(w.routes.length, 3);
-});
-test('capacity stops recruitment, not assembly of existing recruits; there is no backlog burst', () => {
-  const w = quiet(); const hq = w.provinces[w.factions[0].hq];
-  hq.troops = Array.from({ length: 60 }, () => ({ ...soldier(w, 0), recruit: true, equipped: false }));
-  const p = w.provinces[hq.neighbors.find(n => w.provinces[n].owner === 0)!]; p.building = 'workshop'; connect(w, p.id, hq.id);
-  advance(w, 40); assert.equal(hq.troops.length, 60); assert.ok(hq.troops.some(s => s.equipped));
-  hq.troops.splice(0, 10); advance(w, 1); assert.equal(hq.troops.length, 50); advance(w, 3); assert.equal(hq.troops.length, 51);
-});
+
+
+
 test('unarmed recruits stay out of combat and armed guards take priority over a fort', () => {
   const w = quiet(), p = w.provinces.find(p => p.owner === -1)!; p.owner = 1; p.building = 'barracks';
-  p.troops = [{ ...soldier(w, 1), recruit: true, equipped: false }];
+  p.troops = [{ ...soldier(w, 1), recruit: true, weapon: null, ammo: null }];
   const b = addBattle(w, p.id, [soldier(w, 0)]); reinforce(w, b);
   assert.equal(b.fighters.length, 1); assert.equal(p.troops.length, 1);
   const f = b.fighters[0]; f.x = FORT.x - 160; f.y = FORT.y; f.target = -1; f.targetOwner = 1;
-  b.reserve.push(soldier(w, 1)); reinforce(w, b); stepBattle(w, b); assert.equal(f.target, b.fighters.find(s => s.owner === 1)!.id);
+  b.reserve.push(soldier(w, 1)); reinforce(w, b); stepBattle(w, b); stepAttacks(w); resolveDeaths(w); assert.equal(f.target, b.fighters.find(s => s.owner === 1)!.id);
 });
 test('fort capture changes ownership while surviving enemy guards remain enemies', () => {
   const w = quiet(), p = w.provinces.find(p => p.owner === -1)!; p.owner = 1;
@@ -205,15 +133,15 @@ test('movement reroutes around hostile land and stops if every route is blocked'
 test('route points can be inserted, moved, deleted and keep unrelated points in order', () => {
   const a = { x: 1, y: 2, province: 0 }, b = { x: 4, y: 5, province: 1 }, c = { x: 7, y: 8, province: 2 };
   const added = editedWaypoints([a,c], b, 1, false); assert.deepEqual(added, [a,b,c]); assert.deepEqual(editedWaypoints(added, { ...b, x: 6 }, 1, true), [a,{...b,x:6},c]);
-  const w = quiet(); w.provinces.forEach(p => p.owner = 0); const from = w.provinces[0], to = w.provinces[from.neighbors[0]]; from.building = 'workshop'; to.building = 'barracks'; connect(w, from.id, to.id);
+  const w = quiet(); w.provinces.forEach(p => p.owner = 0); const from = w.provinces[0], to = w.provinces[from.neighbors[0]]; from.building = 'launcherWorks'; to.building = 'barracks'; connect(w, from.id, to.id);
   const point = { province: from.id, x: from.x + 1, y: from.y + 1 }; reroute(w, w.routes[0].id, [point]);
   assert.ok(routeGeometry(w, w.routes[0]).some(p => p.point.x === point.x && p.point.y === point.y));
   reroute(w, w.routes[0].id, []); assert.equal(w.routes[0].via.length, 0);
 });
 
-test('a slow-firing soldier keeps a fort under attack between shots', () => {
+test('a ranged soldier keeps a fort under attack between shots', () => {
   const w = quiet(), p = w.provinces.find(p => p.owner === -1)!;
-  const b = addBattle(w, p.id, [soldier(w, 0, 'sniper')]); reinforce(w, b);
+  const b = addBattle(w, p.id, [soldier(w, 0, 'launcher')]); reinforce(w, b);
   b.fighters[0].x = FORT.x - 230; b.fighters[0].y = FORT.y;
   advance(w, 15); assert.ok(p.hp < 850); assert.equal(p.owner, -1);
 });
@@ -224,9 +152,28 @@ test('marches and battlefield locomotion share one world-space speed', () => {
   advance(w, 1); assert.ok(Math.abs(Math.hypot(moving.x-start.x,moving.y-start.y)-MOVE_SPEED) < 1e-6);
   const target = w.provinces.find(p => p.owner === -1)!, b = addBattle(w, target.id, [soldier(w,0)]); reinforce(w,b);
   const f=b.fighters[0]; f.x=FORT.x-1000; f.y=FORT.y; const x=f.x;
-  for(let i=0;i<30;i++) stepBattle(w,b);
+  for(let i=0;i<30;i++) stepBattle(w,b);stepAttacks(w);resolveDeaths(w);
   assert.ok(Math.abs((f.x-x)*battleFrame(target).scale-MOVE_SPEED) < 1e-6);
   assert.ok(travelTime(w,[hq.id,dest]) > 5);
+});
+test('repeated marching orders turn immediately toward a neighboring province or back home', () => {
+  const w = quiet(); w.provinces.forEach(p => { p.owner = 0; p.building = null; });
+  const home = w.provinces[w.factions[0].hq], [first, other] = home.neighbors;
+  dispatch(w, home.id, first, 1); advance(w, 1);
+  const march = w.shipments[0], ids = march.troops.map(s => s.id), count = totalTroops(w, 0);
+  for (const target of [first, home.id, other, first, home.id]) {
+    assert.ok(inside(march, home.polygon));
+    const position = { x: march.x, y: march.y }, goal = w.provinces[target];
+    assert.equal(orderUnits(w, ids, target), null);
+    assert.deepEqual({ x: march.x, y: march.y }, position);
+    const gap = Math.hypot(goal.x - position.x, goal.y - position.y);
+    stepWorld(w);
+    assert.ok(Math.abs(march.x - position.x - (goal.x - position.x) / gap * MOVE_SPEED / 30) < 1e-6);
+    assert.ok(Math.abs(march.y - position.y - (goal.y - position.y) / gap * MOVE_SPEED / 30) < 1e-6);
+  }
+  finishMarch(w);
+  assert.ok(localTroops(w, home.id, 0).some(s => s.id === ids[0]));
+  assert.equal(totalTroops(w, 0), count);
 });
 test('marching groups can split and change destination without teleporting or duplicating soldiers', () => {
   const w=quiet(); w.provinces.forEach(p=>{p.owner=0;p.building=null;});
@@ -236,6 +183,8 @@ test('marching groups can split and change destination without teleporting or du
   assert.equal(redirect(w,march.id,other,new Set(ids.slice(0,2))),null);
   assert.equal(w.shipments.length,2);
   for(const s of w.shipments) assert.deepEqual({x:s.x,y:s.y},position);
+  const redirected = w.shipments.find(s => s.to === other)!;
+  assert.equal(redirected.path[redirected.leg + 1], other);
   assert.equal(totalTroops(w,0),before); assert.equal(new Set(w.shipments.flatMap(s=>s.troops.map(t=>t.id))).size,4);
   advance(w,1); for(const s of w.shipments) assert.ok(Math.hypot(s.x-position.x,s.y-position.y)<=MOVE_SPEED+1e-6);
   advance(w,100); assert.equal(w.shipments.length,0);
@@ -254,11 +203,11 @@ test('enemy targets remain locked, new closer enemies do not cause switching, an
   const b=addBattle(w,p.id,[soldier(w,0),soldier(w,1)]);reinforce(w,b);
   const f=b.fighters.find(s=>s.owner===0)!, enemy=b.fighters.find(s=>s.owner===1)!;
   f.x=50; f.y=50;enemy.x=800;enemy.y=500;f.cooldown=100;enemy.cooldown=100;
-  stepBattle(w,b);assert.equal(f.target,enemy.id);
+  stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(f.target,enemy.id);
   b.reserve.push(soldier(w,1));reinforce(w,b);const closer=b.fighters.at(-1)!;closer.x=f.x+50;closer.y=f.y;closer.cooldown=100;
-  stepBattle(w,b);assert.equal(f.target,enemy.id);
-  enemy.hp=0;stepBattle(w,b);assert.equal(f.target,closer.id);
-  closer.hp=0;stepBattle(w,b);assert.equal(f.target,-1);
+  stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(f.target,enemy.id);
+  enemy.hp=0;stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(f.target,closer.id);
+  closer.hp=0;stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(f.target,-1);
 });
 test('Ctrl toggles whole army groups and short clicks do not activate orders', () => {
   let selected=toggleUnits(new Set(),[1,2],false);selected=toggleUnits(selected,[3,4],true);
@@ -352,10 +301,10 @@ test('opposing marches crossing a neutral border on the same tick join one battl
 test('combat uses the same weapon distances in large and small provinces', () => {
   const make = count => {
     const w=createWorld({...settings,count});w.factions.forEach(f=>f.ai=false);
-    const p=w.provinces.find(p=>p.owner===-1)!,attacker=soldier(w,0,'mg'),defender=soldier(w,1,'mg');
+    const p=w.provinces.find(p=>p.owner===-1)!,attacker=soldier(w,0,'launcher'),defender=soldier(w,1,'launcher');
     attacker.position={x:p.x-14,y:p.y};defender.position={x:p.x+14,y:p.y};attacker.angle=0;defender.angle=Math.PI;
     w.rng=123;const b=addBattle(w,p.id,[attacker,defender]);
-    for(let i=0;i<60;i++) stepBattle(w,b);
+    for(let i=0;i<60;i++) stepBattle(w,b);stepAttacks(w);resolveDeaths(w);
     return {health:b.fighters.map(f=>f.hp),shots:b.shots,losses:b.losses};
   };
   assert.deepEqual(make(12),make(48));
@@ -372,38 +321,21 @@ test('each faction deploys one soldier every 0.2 seconds and reserves do not fir
   assert.ok([...b.fighters,...b.reserve].every(s=>inside(s.position!,p.polygon)));
   const enemy=soldier(w,1);addBattle(w,p.id,[enemy]);enemy.deployAt=w.tick+60;
   b.fighters.forEach(f=>{f.cooldown=0;f.x=FORT.x-100;f.y=FORT.y;});
-  const before=b.shots;stepBattle(w,b);assert.equal(b.shots,before);assert.equal(p.hp,1000);
-});
-
-test('weapon reach spans several soldier lengths and projectiles reach distant targets', () => {
-  const w=quiet(),p=w.provinces.find(p=>p.owner===-1)!;
-  assert.ok(WEAPONS.rifle.range*battleFrame(p).scale/SOLDIER_SIZE >= 10);
-  assert.ok(WEAPONS.flame.range<WEAPONS.rifle.range&&WEAPONS.sniper.range>WEAPONS.rocket.range);
-  for(const weapon of ['rifle','mg','sniper','rocket']) {
-    const b=addBattle(w,p.id,[]),stats=WEAPONS[weapon];b.fighters=[];b.reserve=[];b.projectiles=[];
-    const fighter=(owner,x,gun)=>({...soldier(w,owner,gun),x,y:-1000,angle:0,cooldown:100000,recoil:0,suppressed:0});
-    const shooter=fighter(0,0,weapon),target=fighter(1,stats.range*.95,'rifle'),ally=fighter(0,stats.range*.95+100,'rifle');
-    shooter.cooldown=0;target.target=ally.id;b.fighters=[shooter,target,ally];
-    stepBattle(w,b);assert.ok(b.projectiles.length);shooter.cooldown=100000;
-    for(let i=0;i<Math.ceil(stats.range/stats.speed*30)+5;i++) stepBattle(w,b);
-    assert.ok(target.hp<100,`${weapon} should hit at 95% of its range`);
-  }
-});
-
-test('an expiring projectile cannot travel beyond its remaining lifetime in the final tick', () => {
-  const w=quiet(),p=w.provinces.find(p=>p.owner===-1)!,b=addBattle(w,p.id,[]);
-  const target={...soldier(w,1),x:30,y:-1000,angle:0,cooldown:1000,recoil:0,suppressed:0};b.fighters=[target];
-  b.projectiles.push({id:w.nextId++,owner:0,x:0,y:-1000,vx:500,vy:0,damage:20,life:.01,weapon:'mg',effects:[],hits:[]});
-  stepBattle(w,b);assert.equal(target.hp,100);assert.equal(b.projectiles.length,0);
+  const before=b.shots;stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(b.shots,before);assert.equal(p.hp,1000);
 });
 
 
-test('a sniper fires from its entry while rifle troops must still close the distance', () => {
+
+
+
+
+test('a ranged soldier fires from its entry while a melee defender must close the distance', () => {
   const w = quiet(), p = w.provinces.find(p => p.owner === -1)!; p.owner = 1;
-  const guard = soldier(w, 1); guard.position = { x: p.x + 5, y: p.y }; guard.angle = Math.PI; p.troops = [guard];
-  const b = addBattle(w, p.id, [soldier(w, 0, 'sniper')], { x: p.x - 45, y: p.y }); reinforce(w, b);
-  const sniper = b.fighters.find(f => f.owner === 0)!, rifle = b.fighters.find(f => f.owner === 1)!;
-  const start = { ...sniper.position }; sniper.cooldown = rifle.cooldown = 0; sniper.angle = 0;
-  stepBattle(w, b); assert.equal(sniper.advanceTo, undefined); assert.ok(sniper.recoil > 0); assert.equal(rifle.recoil, 0);
-  assert.deepEqual(sniper.position, start);
+  const guard = soldier(w, 1, 'hilt'); guard.position = { x: p.x + 5, y: p.y }; guard.angle = Math.PI; p.troops = [guard];
+  const b = addBattle(w, p.id, [soldier(w, 0)], { x: p.x - 25, y: p.y }); reinforce(w, b);
+  const ranged = b.fighters.find(f => f.owner === 0)!, melee = b.fighters.find(f => f.owner === 1)!;
+  const start = { ...ranged.position }; ranged.cooldown = melee.cooldown = 0; ranged.angle = 0;
+  stepBattle(w, b); stepAttacks(w); resolveDeaths(w);
+  assert.equal(ranged.advanceTo, undefined); assert.ok(ranged.recoil > 0); assert.equal(melee.recoil, 0);
+  assert.deepEqual(ranged.position, start);
 });

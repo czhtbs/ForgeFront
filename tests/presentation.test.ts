@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld, connect, reroute, soldier, stepWorld } from '../src/sim/world.ts';
+import { stepAttacks, resolveDeaths } from '../src/sim/attacks.ts';
 import { addBattle, reinforce, stepBattle, fortAim, SPLASH_RADIUS } from '../src/sim/combat.ts';
 import { battleFrame, BATTLE_SPACING, buildingWidth, fortPosition } from '../src/sim/spatial.ts';
 import { FORT } from '../src/sim/types.ts';
@@ -27,7 +28,7 @@ test('one travelling point crosses joints continuously and is unaffected by subd
 
 test('overlapping supply routes get separate lanes while both ends remain on buildings', () => {
   const w = make(); w.provinces.forEach(p => { p.owner = 0; p.building = 'barracks'; });
-  const source = w.provinces[0], junction = w.provinces[source.neighbors[0]], targets = junction.neighbors.filter(n => n !== source.id).slice(0, 2); source.building = 'workshop';
+  const source = w.provinces[0], junction = w.provinces[source.neighbors[0]], targets = junction.neighbors.filter(n => n !== source.id).slice(0, 2); source.building = 'launcherWorks';
   for (const id of targets) { assert.equal(connect(w, source.id, id), null); reroute(w, w.routes.at(-1)!.id, [{ x: junction.x, y: junction.y, province: junction.id }]); }
   const lanes = supplyLanes(w, source.id, 1);
   assert.equal(lanes.length, 2);
@@ -55,11 +56,11 @@ test('command arrow lifts from the ground and stays compact at different zoom le
 
 test('casualties persist beyond a completed battle, scatter real components, then expire', () => {
   const w = make(), p = w.provinces.find(p => p.owner === -1)!; p.owner = 0;
-  const b = addBattle(w, p.id, [soldier(w, 0), soldier(w, 1, 'rocket')]); b.reserve.forEach(s => s.deployAt = 0); reinforce(w, b);
+  const b = addBattle(w, p.id, [soldier(w, 0), soldier(w, 1, 'launcher')]); b.reserve.forEach(s => s.deployAt = 0); reinforce(w, b);
   const victim = b.fighters.find(f => f.owner === 1)!; victim.hp = 0; victim.killedBy = 0; victim.hitAngle = .4;
   stepWorld(w); assert.equal(w.casualties.length, 1); assert.ok(!w.battles.includes(b));
   const c = w.casualties[0], beginning = deathFragments(c, 0), thrown = deathFragments(c, .3), settled = deathFragments(c, 2);
-  assert.deepEqual(thrown.map(p => p.frame), [0, 1, 5]); assert.ok(thrown.some((p, i) => Math.hypot(p.x - beginning[i].x, p.y - beginning[i].y) > 1));
+  assert.deepEqual(thrown.map(p => p.frame), [0, 1, 2]); assert.ok(thrown.some((p, i) => Math.hypot(p.x - beginning[i].x, p.y - beginning[i].y) > 1));
   assert.ok(settled.every(p => p.alpha === 1)); assert.ok(deathFragments(c, 5).every(p => p.alpha === 0));
   for (let i = 0; i < 151; i++) stepWorld(w); assert.equal(w.casualties.length, 0);
 });
@@ -68,23 +69,23 @@ test('combat separation opens a modest gap without exceeding the splash radius',
   const w = make(), p = w.provinces.find(p => p.owner === -1)!, b = addBattle(w, p.id, []), scale = battleFrame(p).scale;
   const f = (id: number, x: number) => ({ ...soldier(w, id), x, y: 0, angle: 0, cooldown: 1000, recoil: 0, suppressed: 0 });
   b.fighters = [f(0, 200), f(0, 200), f(1, 1500)];
-  for (let i = 0; i < 30; i++) stepBattle(w, b);
+  for (let i = 0; i < 30; i++) stepBattle(w, b); stepAttacks(w); resolveDeaths(w);
   const gap = Math.hypot(b.fighters[0].x - b.fighters[1].x, b.fighters[0].y - b.fighters[1].y) * scale;
   assert.ok(gap >= BATTLE_SPACING * .98); assert.ok(gap < BATTLE_SPACING * 1.3); assert.ok(SPLASH_RADIUS * scale > BATTLE_SPACING);
 });
 
 test('fort shots aim and land at different opaque locations on each building sprite', () => {
   const w = make(), p = w.provinces.find(p => p.owner === -1)!;
-  for (const kind of ['hq', 'barracks', 'workshop', 'mine', null] as const) {
+  for (const kind of ['hq', 'barracks', 'launcherWorks', 'ammoWorks', 'attachmentWorks', 'mine', null] as const) {
     p.building = kind; const locations = new Set<string>(), size = buildingWidth(p) / battleFrame(p).scale;
-    for (let i = 0; i < 35; i++) { const aim = fortAim(w, p.id); locations.add(`${aim.x},${aim.y}`); assert.ok(BUILDING_HITS[kind ?? 'fort'].some(([x, y]) => Math.abs(aim.x - FORT.x - x * size) < 1e-6 && Math.abs(aim.y - FORT.y - y * size) < 1e-6)); }
+    for (let i = 0; i < 35; i++) { const aim = fortAim(w, p.id); locations.add(`${aim.x},${aim.y}`); assert.ok(BUILDING_HITS[kind?.endsWith('Works') ? 'workshop' : kind ?? 'fort'].some(([x, y]) => Math.abs(aim.x - FORT.x - x * size) < 1e-6 && Math.abs(aim.y - FORT.y - y * size) < 1e-6)); }
     assert.ok(locations.size > 10);
   }
-  p.building = 'workshop'; const b = addBattle(w, p.id, [soldier(w, 0, 'mg')]); reinforce(w, b);
+  p.building = 'launcherWorks'; const b = addBattle(w, p.id, [soldier(w, 0, 'launcher')]); reinforce(w, b);
   const attacker = b.fighters[0]; attacker.x = FORT.x - 180; attacker.y = FORT.y; attacker.angle = 0; attacker.cooldown = 0;
   const impacts = new Set<string>();
-  for (let i = 0; i < 180; i++) { stepBattle(w, b); for (const v of b.visuals) if (v.kind === 'fort-hit') impacts.add(`${v.x},${v.y}`); }
+  for (let i = 0; i < 180; i++) { stepBattle(w, b); stepAttacks(w); resolveDeaths(w); for (const v of w.visuals) if (v.kind === 'fort-hit') impacts.add(`${v.x},${v.y}`); }
   assert.ok(p.hp < 1000); assert.ok(impacts.size > 5);
   const near = fortAim(w, p.id), hp = p.hp; attacker.x = near.x - 1; attacker.y = near.y; attacker.fortAim = near; attacker.angle = 0; attacker.cooldown = 0;
-  stepBattle(w, b); assert.ok(p.hp < hp); assert.ok(b.visuals.some(v => v.kind === 'fort-hit' && v.x === near.x && v.y === near.y));
+  stepBattle(w, b); stepAttacks(w); resolveDeaths(w); assert.ok(p.hp < hp); assert.ok(w.visuals.some(v => v.kind === 'fort-hit' && v.x === (battleFrame(p).x + near.x * battleFrame(p).scale) && v.y === (battleFrame(p).y + near.y * battleFrame(p).scale)));
 });
