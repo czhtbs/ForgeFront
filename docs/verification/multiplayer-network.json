@@ -1,0 +1,1400 @@
+{
+  "version": "e067d738586dfbd1",
+  "durationSeconds": 92.958,
+  "clients": 6,
+  "factions": 6,
+  "mapSize": 80,
+  "limit": "3 Mbps aggregate TCP payload, 60–120 ms downstream jitter plus 30–60 ms upstream delay; TLS/IP overhead excluded",
+  "initialBytes": 794768,
+  "totalWireBytes": 1900808,
+  "steadyAverageMbps": 0.08299905084745762,
+  "peakSecondMbps": 1.04468,
+  "peakQueuedBytes": 757212,
+  "finalTick": 2885,
+  "finalHash": "7d06c1a416c0bc10",
+  "recoveryCount": 2,
+  "recoveries": [
+    {
+      "client": 5,
+      "at": 1794302201726
+    },
+    {
+      "client": 1,
+      "at": 1794302228536
+    }
+  ],
+  "expectedCommandRejections": [],
+  "samples": [
+    {
+      "second": 1,
+      "bytes": 13068,
+      "tick": 134,
+      "units": 246,
+      "battles": 0,
+      "backlog": [
+        8,
+        9,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 2,
+      "bytes": 9908,
+      "tick": 165,
+      "units": 252,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 3,
+      "bytes": 9749,
+      "tick": 195,
+      "units": 252,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 4,
+      "bytes": 9696,
+      "tick": 225,
+      "units": 252,
+      "battles": 4,
+      "backlog": [
+        9,
+        9,
+        9,
+        8,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 5,
+      "bytes": 9855,
+      "tick": 255,
+      "units": 258,
+      "battles": 4,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 6,
+      "bytes": 9431,
+      "tick": 285,
+      "units": 258,
+      "battles": 4,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        9
+      ]
+    },
+    {
+      "second": 7,
+      "bytes": 9643,
+      "tick": 315,
+      "units": 264,
+      "battles": 4,
+      "backlog": [
+        9,
+        8,
+        8,
+        8,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 8,
+      "bytes": 10226,
+      "tick": 346,
+      "units": 264,
+      "battles": 4,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 9,
+      "bytes": 9537,
+      "tick": 376,
+      "units": 270,
+      "battles": 4,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 10,
+      "bytes": 12575,
+      "tick": 407,
+      "units": 270,
+      "battles": 3,
+      "backlog": [
+        10,
+        10,
+        10,
+        9,
+        10,
+        10
+      ]
+    },
+    {
+      "second": 11,
+      "bytes": 10020,
+      "tick": 437,
+      "units": 276,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 12,
+      "bytes": 9645,
+      "tick": 467,
+      "units": 276,
+      "battles": 1,
+      "backlog": [
+        9,
+        8,
+        9,
+        9,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 13,
+      "bytes": 12347,
+      "tick": 497,
+      "units": 282,
+      "battles": 1,
+      "backlog": [
+        9,
+        8,
+        8,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 14,
+      "bytes": 9855,
+      "tick": 528,
+      "units": 282,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 15,
+      "bytes": 9802,
+      "tick": 558,
+      "units": 288,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 16,
+      "bytes": 12266,
+      "tick": 588,
+      "units": 288,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 17,
+      "bytes": 9908,
+      "tick": 618,
+      "units": 294,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 18,
+      "bytes": 9749,
+      "tick": 649,
+      "units": 294,
+      "battles": 4,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 19,
+      "bytes": 9590,
+      "tick": 679,
+      "units": 300,
+      "battles": 4,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 20,
+      "bytes": 9802,
+      "tick": 709,
+      "units": 300,
+      "battles": 4,
+      "backlog": [
+        9,
+        9,
+        8,
+        9,
+        14,
+        8
+      ]
+    },
+    {
+      "second": 21,
+      "bytes": 9696,
+      "tick": 739,
+      "units": 303,
+      "battles": 5,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        44,
+        9
+      ]
+    },
+    {
+      "second": 22,
+      "bytes": 9749,
+      "tick": 769,
+      "units": 307,
+      "battles": 5,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        74,
+        9
+      ]
+    },
+    {
+      "second": 23,
+      "bytes": 9855,
+      "tick": 799,
+      "units": 303,
+      "battles": 4,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        104,
+        8
+      ]
+    },
+    {
+      "second": 24,
+      "bytes": 8954,
+      "tick": 832,
+      "units": 305,
+      "battles": 4,
+      "backlog": [
+        11,
+        11,
+        11,
+        11,
+        11,
+        11
+      ]
+    },
+    {
+      "second": 25,
+      "bytes": 14507,
+      "tick": 865,
+      "units": 301,
+      "battles": 4,
+      "backlog": [
+        10,
+        9,
+        10,
+        10,
+        9,
+        21
+      ]
+    },
+    {
+      "second": 26,
+      "bytes": 9861,
+      "tick": 895,
+      "units": 302,
+      "battles": 4,
+      "backlog": [
+        9,
+        8,
+        9,
+        8,
+        8,
+        51
+      ]
+    },
+    {
+      "second": 27,
+      "bytes": 9802,
+      "tick": 926,
+      "units": 296,
+      "battles": 4,
+      "backlog": [
+        10,
+        9,
+        10,
+        10,
+        10,
+        82
+      ]
+    },
+    {
+      "second": 28,
+      "bytes": 10931,
+      "tick": 957,
+      "units": 301,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        10,
+        9,
+        10,
+        113
+      ]
+    },
+    {
+      "second": 29,
+      "bytes": 9749,
+      "tick": 987,
+      "units": 301,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        143
+      ]
+    },
+    {
+      "second": 30,
+      "bytes": 9569,
+      "tick": 1017,
+      "units": 307,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        8,
+        9,
+        8,
+        173
+      ]
+    },
+    {
+      "second": 31,
+      "bytes": 11744,
+      "tick": 1047,
+      "units": 307,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        8,
+        9,
+        9,
+        203
+      ]
+    },
+    {
+      "second": 32,
+      "bytes": 10092,
+      "tick": 1077,
+      "units": 313,
+      "battles": 0,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        233
+      ]
+    },
+    {
+      "second": 33,
+      "bytes": 10200,
+      "tick": 1108,
+      "units": 319,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        264
+      ]
+    },
+    {
+      "second": 34,
+      "bytes": 22796,
+      "tick": 1138,
+      "units": 319,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 35,
+      "bytes": 9984,
+      "tick": 1168,
+      "units": 325,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 36,
+      "bytes": 9768,
+      "tick": 1198,
+      "units": 325,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        7
+      ]
+    },
+    {
+      "second": 37,
+      "bytes": 10092,
+      "tick": 1228,
+      "units": 331,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 38,
+      "bytes": 9822,
+      "tick": 1258,
+      "units": 331,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        8
+      ]
+    },
+    {
+      "second": 39,
+      "bytes": 9768,
+      "tick": 1288,
+      "units": 337,
+      "battles": 3,
+      "backlog": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ]
+    },
+    {
+      "second": 40,
+      "bytes": 15048,
+      "tick": 1319,
+      "units": 337,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 42,
+      "bytes": 10044,
+      "tick": 1349,
+      "units": 343,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 43,
+      "bytes": 9714,
+      "tick": 1379,
+      "units": 343,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 44,
+      "bytes": 10254,
+      "tick": 1410,
+      "units": 349,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 45,
+      "bytes": 10146,
+      "tick": 1441,
+      "units": 349,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 46,
+      "bytes": 9066,
+      "tick": 1471,
+      "units": 355,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        25,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 47,
+      "bytes": 10536,
+      "tick": 1503,
+      "units": 361,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        57,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 48,
+      "bytes": 130585,
+      "tick": 1533,
+      "units": 361,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        87,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 49,
+      "bytes": 25717,
+      "tick": 1563,
+      "units": 367,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 50,
+      "bytes": 9796,
+      "tick": 1593,
+      "units": 367,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        9,
+        9,
+        8,
+        9
+      ]
+    },
+    {
+      "second": 51,
+      "bytes": 10358,
+      "tick": 1623,
+      "units": 373,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 52,
+      "bytes": 10064,
+      "tick": 1654,
+      "units": 373,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 53,
+      "bytes": 9930,
+      "tick": 1684,
+      "units": 379,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        9,
+        9,
+        8,
+        9
+      ]
+    },
+    {
+      "second": 54,
+      "bytes": 9930,
+      "tick": 1714,
+      "units": 379,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        9,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 55,
+      "bytes": 9822,
+      "tick": 1744,
+      "units": 385,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        9,
+        9,
+        8,
+        9
+      ]
+    },
+    {
+      "second": 56,
+      "bytes": 10152,
+      "tick": 1775,
+      "units": 385,
+      "battles": 2,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 57,
+      "bytes": 9934,
+      "tick": 1805,
+      "units": 391,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 58,
+      "bytes": 10146,
+      "tick": 1836,
+      "units": 391,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 59,
+      "bytes": 9876,
+      "tick": 1866,
+      "units": 397,
+      "battles": 1,
+      "backlog": [
+        9,
+        8,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 60,
+      "bytes": 9876,
+      "tick": 1896,
+      "units": 403,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 61,
+      "bytes": 9984,
+      "tick": 1927,
+      "units": 403,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 62,
+      "bytes": 23591,
+      "tick": 1957,
+      "units": 409,
+      "battles": 1,
+      "backlog": [
+        9,
+        8,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 63,
+      "bytes": 9984,
+      "tick": 1987,
+      "units": 409,
+      "battles": 1,
+      "backlog": [
+        9,
+        8,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 64,
+      "bytes": 9876,
+      "tick": 2017,
+      "units": 415,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 65,
+      "bytes": 9984,
+      "tick": 2048,
+      "units": 415,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 66,
+      "bytes": 10038,
+      "tick": 2078,
+      "units": 421,
+      "battles": 1,
+      "backlog": [
+        9,
+        8,
+        8,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 67,
+      "bytes": 9984,
+      "tick": 2108,
+      "units": 421,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        8,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 68,
+      "bytes": 13374,
+      "tick": 2139,
+      "units": 427,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 69,
+      "bytes": 9768,
+      "tick": 2169,
+      "units": 427,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 70,
+      "bytes": 10040,
+      "tick": 2199,
+      "units": 433,
+      "battles": 0,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 71,
+      "bytes": 14278,
+      "tick": 2229,
+      "units": 433,
+      "battles": 0,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 72,
+      "bytes": 9880,
+      "tick": 2260,
+      "units": 439,
+      "battles": 0,
+      "backlog": [
+        9,
+        8,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 73,
+      "bytes": 9876,
+      "tick": 2290,
+      "units": 445,
+      "battles": 0,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 74,
+      "bytes": 10990,
+      "tick": 2321,
+      "units": 445,
+      "battles": 0,
+      "backlog": [
+        9,
+        9,
+        10,
+        9,
+        10,
+        10
+      ]
+    },
+    {
+      "second": 75,
+      "bytes": 10038,
+      "tick": 2350,
+      "units": 451,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 76,
+      "bytes": 9552,
+      "tick": 2381,
+      "units": 451,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 77,
+      "bytes": 10364,
+      "tick": 2411,
+      "units": 457,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        9,
+        9,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 78,
+      "bytes": 9660,
+      "tick": 2441,
+      "units": 457,
+      "battles": 1,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 79,
+      "bytes": 10146,
+      "tick": 2472,
+      "units": 463,
+      "battles": 1,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 80,
+      "bytes": 9984,
+      "tick": 2502,
+      "units": 463,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        9,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 81,
+      "bytes": 9876,
+      "tick": 2532,
+      "units": 469,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 82,
+      "bytes": 9822,
+      "tick": 2562,
+      "units": 469,
+      "battles": 2,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 83,
+      "bytes": 11583,
+      "tick": 2592,
+      "units": 475,
+      "battles": 3,
+      "backlog": [
+        8,
+        9,
+        8,
+        8,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 84,
+      "bytes": 9930,
+      "tick": 2623,
+      "units": 475,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 85,
+      "bytes": 9932,
+      "tick": 2653,
+      "units": 481,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 86,
+      "bytes": 11061,
+      "tick": 2684,
+      "units": 487,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 87,
+      "bytes": 9988,
+      "tick": 2713,
+      "units": 487,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "second": 88,
+      "bytes": 9822,
+      "tick": 2744,
+      "units": 493,
+      "battles": 3,
+      "backlog": [
+        8,
+        9,
+        9,
+        8,
+        9,
+        9
+      ]
+    },
+    {
+      "second": 89,
+      "bytes": 10576,
+      "tick": 2775,
+      "units": 492,
+      "battles": 3,
+      "backlog": [
+        9,
+        9,
+        9,
+        9,
+        9,
+        10
+      ]
+    },
+    {
+      "second": 90,
+      "bytes": 9984,
+      "tick": 2805,
+      "units": 497,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        9
+      ]
+    },
+    {
+      "second": 91,
+      "bytes": 9876,
+      "tick": 2835,
+      "units": 494,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        9
+      ]
+    },
+    {
+      "second": 92,
+      "bytes": 10094,
+      "tick": 2865,
+      "units": 498,
+      "battles": 3,
+      "backlog": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ]
+    }
+  ],
+  "operationLatencyMs": {
+    "samples": 76,
+    "median": 405,
+    "p95": 612,
+    "max": 627
+  }
+}

@@ -1,9 +1,10 @@
+import { sin, cos, atan2 } from './math.ts';
 import { WEAPONS, PAYLOADS, canFight, isWorkshop } from '../content/equipment.ts';
 import { BATTLE_CAP, BATTLE_H, BATTLE_W, STEP, FORT } from './types.ts';
 import type { Battle, Fighter, Point, Soldier, World } from './types.ts';
 import { MOVE_SPEED, battleFrame, BATTLE_SPACING, buildingWidth, assignSlots, formation, toBattle, toWorld, SOLDIER_SIZE } from './spatial.ts';
 import { distance, inside } from './map.ts';
-import { fireAttack, hurt, hurtBuilding } from './attacks.ts';
+import { fireAttack, hurt, hurtBuilding, visual } from './attacks.ts';
 export { segmentDistance } from './attacks.ts';
 import { BUILDING_HITS } from '../content/building-hits.ts';
 export const SPLASH_RADIUS = 30;
@@ -15,12 +16,12 @@ export function queueReinforcements(w: World, b: Battle, incoming: Soldier[], en
     unit.deployAt = Math.max(w.tick, b.nextDeploy[unit.owner] ?? w.tick);
     b.nextDeploy[unit.owner] = unit.deployAt + DEPLOY_TICKS;
     if (entry) {
-      const angle = Math.atan2(province.y - entry.y, province.x - entry.x), lane = (index % 4 - 1.5) * SOLDIER_SIZE * 1.7;
-      unit.position = { x: entry.x + Math.cos(angle) * SOLDIER_SIZE * 1.5 - Math.sin(angle) * lane, y: entry.y + Math.sin(angle) * SOLDIER_SIZE * 1.5 + Math.cos(angle) * lane };
+      const angle = atan2(province.y - entry.y, province.x - entry.x), lane = (index % 4 - 1.5) * SOLDIER_SIZE * 1.7;
+      unit.position = { x: entry.x + cos(angle) * SOLDIER_SIZE * 1.5 - sin(angle) * lane, y: entry.y + sin(angle) * SOLDIER_SIZE * 1.5 + cos(angle) * lane };
       while (!inside(unit.position, province.polygon)) { unit.position.x = (unit.position.x + province.x) / 2; unit.position.y = (unit.position.y + province.y) / 2; }
       unit.angle = angle;
-      const forward = Math.min(SOLDIER_SIZE * 2, distance(unit.position, province)), heading = Math.atan2(province.y - unit.position.y, province.x - unit.position.x);
-      unit.advanceTo = { x: unit.position.x + Math.cos(heading) * forward, y: unit.position.y + Math.sin(heading) * forward };
+      const forward = Math.min(SOLDIER_SIZE * 2, distance(unit.position, province)), heading = atan2(province.y - unit.position.y, province.x - unit.position.x);
+      unit.advanceTo = { x: unit.position.x + cos(heading) * forward, y: unit.position.y + sin(heading) * forward };
     } else unit.position ??= unit.entry ? toWorld(province, unit.entry) : { ...slots[b.reserve.length + index] };
   }
   b.reserve.push(...incoming);
@@ -75,7 +76,7 @@ export function stepBattle(w: World, b: Battle) {
   }
   for (const f of b.fighters) {
     if (f.hp <= 0 || f.frozen! > 0) continue;
-    f.cooldown -= dt; f.recoil = Math.max(0, f.recoil - dt * 7); f.suppressed = Math.max(0, f.suppressed - dt);
+    f.cooldown -= dt; f.recoil = Math.max(0, f.recoil - dt * (f.weapon === 'hilt' ? 4 : 7)); f.suppressed = Math.max(0, f.suppressed - dt);
     const stats = WEAPONS[f.weapon!];
     let target = b.fighters.find(t => t.id === f.target && t.owner !== f.owner && t.hp > 0);
     if (!target) {
@@ -91,24 +92,32 @@ export function stepBattle(w: World, b: Battle) {
     let advance = f.advanceTo ? toBattle(province, f.advanceTo) : undefined;
     if (advance && (distance(f, advance) <= MOVE_SPEED / frame.scale * dt || (target || fort) && distance(f, target ?? FORT) - (fort ? FORT.radius : 0) <= stats.range)) { f.advanceTo = undefined; advance = undefined; }
     if (!fort) f.fortAim = undefined;
-    else f.fortAim ??= fortAim(w, b.province);
+    else f.fortAim ??= f.weapon === 'hilt' ? { x: FORT.x, y: FORT.y } : fortAim(w, b.province);
     const goal = advance ?? target ?? FORT;
     const nearest = Math.max(0, distance(f, fort && !advance ? FORT : goal) - (fort && !advance ? FORT.radius : 0));
-    const aim = fort && !advance ? f.fortAim! : goal, desired = Math.atan2(goal.y - f.y, goal.x - f.x), facing = Math.atan2(aim.y - f.y, aim.x - f.x), delta = Math.atan2(Math.sin(facing - f.angle), Math.cos(facing - f.angle));
+    const aim = fort && !advance ? f.fortAim! : goal, desired = atan2(goal.y - f.y, goal.x - f.x), facing = atan2(aim.y - f.y, aim.x - f.x), delta = atan2(sin(facing - f.angle), cos(facing - f.angle));
     f.angle += Math.max(-dt * 7, Math.min(dt * 7, delta));
     if ((advance || target || fort) && nearest > (advance ? 0 : fort && province.hp <= 0 ? 50 : stats.range * .9)) {
       const speed = MOVE_SPEED / frame.scale * (f.suppressed > 0 ? .45 : f.chill! > 0 ? .6 : 1);
-      f.x += Math.cos(desired) * speed * dt; f.y += Math.sin(desired) * speed * dt;
+      f.x += cos(desired) * speed * dt; f.y += sin(desired) * speed * dt;
     }
     f.position = toWorld(province, f);
-    if (!advance && (target || fort) && nearest <= stats.range && f.cooldown <= 0 && (f.weapon === 'hilt' || Math.abs(delta) < .4) && !(f.ammo === 'beam' && w.projectiles.some(p => p.source === f.id && p.ammo === 'beam'))) {
+    if (!advance && (target || fort) && nearest <= stats.range && f.cooldown <= 0 && (f.weapon === 'hilt' || Math.abs(delta) < .4)) {
       f.cooldown = stats.interval; f.recoil = 1; b.shots++;
       if (f.weapon === 'hilt') {
         const amount = stats.damage * (1 + f.effects.filter(e => PAYLOADS.includes(e)).length * .2);
-        if (fort) hurtBuilding(w, province.id, f.owner, amount, toWorld(province, f.fortAim!));
+        const enchantment = (point: Point) => {
+          for (const effect of f.effects) {
+            if (effect === 'blast') visual(w, 'blast', point, undefined, .35, 2);
+            if (effect === 'arc') visual(w, 'arc', f.position!, point);
+            if (effect === 'burn') visual(w, 'flame', point, undefined, .4);
+            if (effect === 'frost') visual(w, 'frost', point, undefined, .4);
+          }
+        };
+        if (fort) { const point = { x: f.position.x + cos(facing) * 3, y: f.position.y + sin(facing) * 3 }; hurtBuilding(w, province.id, f.owner, amount, point, false); enchantment(point); }
         else {
           const enemies = b.fighters.filter(t => t.owner !== f.owner && t.hp > 0 && distance(f, t) <= stats.range).sort((a, b) => Number(b.id === f.target) - Number(a.id === f.target) || distance(f, a) - distance(f, b));
-          enemies.slice(0, f.effects.includes('pierce') ? 3 : 1).forEach((enemy, i) => hurt(w, { unit: enemy, point: toWorld(province, enemy), province: province.id, active: true }, f.owner, amount * .7 ** i, f.position!));
+          enemies.slice(0, f.effects.includes('pierce') ? 3 : 1).forEach((enemy, i) => { const point = toWorld(province, enemy); hurt(w, { unit: enemy, point, province: province.id, active: true }, f.owner, amount * .7 ** i, f.position!); enchantment(point); });
         }
       } else if (!fort || province.hp > 0) fireAttack(w, f, f.position!, toWorld(province, aim), province.id, target?.id ?? -province.id - 1);
       f.fortAim = undefined;
@@ -121,14 +130,14 @@ export function stepBattle(w: World, b: Battle) {
       if (f.id >= other.id) continue;
       const d = distance(f, other);
       if (d >= spacing) continue;
-      let angle = d ? Math.atan2(f.y - other.y, f.x - other.x) : (f.id * 2.399 + other.id) % (Math.PI * 2);
+      let angle = d ? atan2(f.y - other.y, f.x - other.x) : (f.id * 2.399 + other.id) % (Math.PI * 2);
       // A firing line spreads sideways instead of pushing its front rank into the target.
       if (f.owner === other.owner && f.target !== undefined && f.target === other.target) {
         const side = f.angle + Math.PI / 2;
-        angle = side + ((f.x - other.x) * Math.cos(side) + (f.y - other.y) * Math.sin(side) < 0 ? Math.PI : 0);
+        angle = side + ((f.x - other.x) * cos(side) + (f.y - other.y) * sin(side) < 0 ? Math.PI : 0);
       }
       const push = Math.min((spacing - d) / 2, dt * 120);
-      const dx = Math.cos(angle) * push, dy = Math.sin(angle) * push;
+      const dx = cos(angle) * push, dy = sin(angle) * push;
       f.x += dx; f.y += dy; other.x -= dx; other.y -= dy;
     }
   }

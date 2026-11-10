@@ -1,0 +1,15 @@
+{
+  "origin": "https://czhtbs.ykcryobs.cn",
+  "version": "e067d738586dfbd1",
+  "checks": [
+    "guest identity, station navigation, protected HTML, current JS, SVG cards, sprites and WSS",
+    "guest identity, station navigation, protected HTML, current JS, SVG cards, sprites and WSS"
+  ],
+  "match": {
+    "players": 2,
+    "tick": 93,
+    "winner": 1,
+    "hash": "c3ead38f6013c439"
+  },
+  "usedRegisteredAccounts": false
+}

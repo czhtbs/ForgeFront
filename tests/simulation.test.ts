@@ -11,6 +11,7 @@ import { routeGeometry, editedWaypoints } from '../src/render/geometry.ts';
 import { MOVE_SPEED, battleFrame, formation, troopSize, assignSlots, toWorld, toBattle, SOLDIER_SIZE } from '../src/sim/spatial.ts';
 import { toggleUnits, orderGesture } from '../src/ui/interaction.ts';
 import { movementPath } from '../src/sim/map.ts';
+import { stepLocalWorld } from '../src/sim/lockstep.ts';
 const settings = { seed: 4521, count: 12, enemies: 1, difficulty: 'normal' as const };
 const advance = (w, seconds) => { for (let i = 0; i < seconds * 30; i++) stepWorld(w); };
 const finishMarch = w => { for (let i=0;i<180*30 && w.shipments.length;i++) stepWorld(w); assert.equal(w.shipments.length,0); };
@@ -63,7 +64,7 @@ test('active entity limits preserve excess soldiers after deployment', () => {
 
 
 test('identical commands reproduce simulation and AI decisions; all soldier IDs are unique', () => {
-  const a = createWorld(settings), b = createWorld(settings); advance(a, 35); advance(b, 35); assert.deepEqual(a, b);
+  const a = createWorld(settings), b = createWorld(settings); for (let i = 0; i < 35 * 30; i++) { stepLocalWorld(a); stepLocalWorld(b); } assert.deepEqual(a, b);
   const units = [...a.provinces.flatMap(p => [...p.troops, ...p.mobile]), ...a.shipments.flatMap(s => s.troops), ...a.battles.flatMap(b => [...b.fighters, ...b.reserve])];
   assert.equal(units.length, new Set(units.map(s => s.id)).size); assert.equal(units.length, a.factions.reduce((n, f) => n + totalTroops(a, f.id), 0));
 });
@@ -286,8 +287,9 @@ test('opposing marches crossing a neutral border on the same tick join one battl
   for(const [owner,from] of p.neighbors.slice(0,2).entries()) {
     const origin=w.provinces[from];origin.owner=owner;origin.building=null;origin.troops=[soldier(w,owner)];origin.mobile=[];
     assert.equal(dispatch(w,from,p.id,1,owner),null);
-    const march=w.shipments.at(-1)!,edge=p.polygon.filter(v=>origin.polygon.some(q=>Math.hypot(v.x-q.x,v.y-q.y)<.01));
-    const midpoint={x:(edge[0].x+edge[1].x)/2,y:(edge[0].y+edge[1].y)/2},length=Math.hypot(p.x-midpoint.x,p.y-midpoint.y);
+    const march=w.shipments.at(-1)!; let outside={x:origin.x,y:origin.y},inner={x:p.x,y:p.y};
+    for(let i=0;i<40;i++){const middle={x:(outside.x+inner.x)/2,y:(outside.y+inner.y)/2};if(inside(middle,p.polygon))inner=middle;else outside=middle;}
+    const midpoint=inner,length=Math.hypot(p.x-midpoint.x,p.y-midpoint.y);
     march.x=midpoint.x-(p.x-midpoint.x)/length*.1;march.y=midpoint.y-(p.y-midpoint.y)/length*.1;
     march.troops[0].position={x:march.x,y:march.y};
   }

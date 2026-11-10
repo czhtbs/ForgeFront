@@ -6,10 +6,29 @@ import { addBattle, reinforce, stepBattle, fortAim, SPLASH_RADIUS } from '../src
 import { battleFrame, BATTLE_SPACING, buildingWidth, fortPosition } from '../src/sim/spatial.ts';
 import { FORT } from '../src/sim/types.ts';
 import { lineLength, pointAlong, supplyLanes, commandRibbon, attackDestination } from '../src/render/geometry.ts';
-import { deathFragments } from '../src/render/art.ts';
+import { deathFragments, swordPose, portraitFrame, ARMY_PORTRAITS } from '../src/render/art.ts';
 import { elevation } from '../src/render/terrain.ts';
 import { BUILDING_HITS } from '../src/content/building-hits.ts';
 const make = () => { const w = createWorld({ seed: 4521, count: 40, enemies: 1, difficulty: 'normal' }); w.factions.forEach(f => f.ai = false); return w; };
+
+test('sword swings around the hand and its army portrait uses artwork instead of a text overlay', () => {
+  const w = make(), unit = { ...soldier(w, 0, 'hilt'), position: { x: 30, y: 40 }, angle: 0 };
+  const poses = [1, .8, .3, 0].map(recoil => swordPose(unit, recoil));
+  assert.ok(poses.every(p => Math.abs(Math.hypot(p.tip.x - p.grip.x, p.tip.y - p.grip.y) - 3) < 1e-9));
+  assert.deepEqual(poses[0].grip, poses[1].grip); assert.ok(Math.hypot(poses[1].tip.x - poses[2].tip.x, poses[1].tip.y - poses[2].tip.y) > 4);
+  assert.deepEqual(poses[0], poses[3]); assert.equal(ARMY_PORTRAITS[portraitFrame(unit)], 'sword');
+});
+
+test('melee attacks damage buildings without ranged yellow hit marks and retain a visible swing', () => {
+  const w = make(), p = w.provinces.find(p => p.owner === -1)!; p.building = 'launcherWorks';
+  const b = addBattle(w, p.id, [soldier(w, 0, 'hilt')]); reinforce(w, b);
+  const fighter = b.fighters[0]; fighter.x = FORT.x - FORT.radius - 35; fighter.y = FORT.y; fighter.angle = 0; fighter.cooldown = 0;
+  const hp = p.hp; stepBattle(w, b);
+  assert.equal(p.hp, hp - 28); assert.equal(fighter.recoil, 1); assert.equal(w.projectiles.length, 0);
+  assert.ok(!w.visuals.some(v => v.kind === 'fort-hit'));
+  for (let i = 0; i < 6; i++) stepBattle(w, b); assert.ok(fighter.recoil > 0);
+  for (let i = 0; i < 3; i++) stepBattle(w, b); assert.equal(fighter.recoil, 0); assert.equal(p.hp, hp - 28);
+});
 
 test('ground relief is deterministic, varied and continuous across arbitrary province borders', () => {
   const values = Array.from({ length: 80 }, (_, i) => elevation(i * 11, i * 6, 4521));
@@ -76,7 +95,7 @@ test('combat separation opens a modest gap without exceeding the splash radius',
 
 test('fort shots aim and land at different opaque locations on each building sprite', () => {
   const w = make(), p = w.provinces.find(p => p.owner === -1)!;
-  for (const kind of ['hq', 'barracks', 'launcherWorks', 'ammoWorks', 'attachmentWorks', 'mine', null] as const) {
+  for (const kind of ['hq', 'barracks', 'launcherWorks', 'attachmentWorks', 'mine', null] as const) {
     p.building = kind; const locations = new Set<string>(), size = buildingWidth(p) / battleFrame(p).scale;
     for (let i = 0; i < 35; i++) { const aim = fortAim(w, p.id); locations.add(`${aim.x},${aim.y}`); assert.ok(BUILDING_HITS[kind?.endsWith('Works') ? 'workshop' : kind ?? 'fort'].some(([x, y]) => Math.abs(aim.x - FORT.x - x * size) < 1e-6 && Math.abs(aim.y - FORT.y - y * size) < 1e-6)); }
     assert.ok(locations.size > 10);

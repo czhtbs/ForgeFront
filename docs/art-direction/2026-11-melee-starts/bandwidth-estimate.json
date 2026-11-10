@@ -1,0 +1,115 @@
+{
+  "note": "Offline size estimate for an illustrative quantized full dynamic snapshot; not an implemented or measured network protocol. Static geometry is excluded. No transport overhead.",
+  "players": 6,
+  "snapshotsPerSecond": 10,
+  "samples": [
+    {
+      "seconds": 0,
+      "units": 240,
+      "battles": 0,
+      "projectiles": 0,
+      "bytes": 12454,
+      "gzipBytes": 1385
+    },
+    {
+      "seconds": 10,
+      "units": 258,
+      "battles": 4,
+      "projectiles": 44,
+      "bytes": 14643,
+      "gzipBytes": 2808
+    },
+    {
+      "seconds": 20,
+      "units": 288,
+      "battles": 3,
+      "projectiles": 16,
+      "bytes": 14707,
+      "gzipBytes": 2670
+    },
+    {
+      "seconds": 30,
+      "units": 305,
+      "battles": 3,
+      "projectiles": 52,
+      "bytes": 16631,
+      "gzipBytes": 3562
+    },
+    {
+      "seconds": 40,
+      "units": 312,
+      "battles": 2,
+      "projectiles": 30,
+      "bytes": 15923,
+      "gzipBytes": 3378
+    },
+    {
+      "seconds": 50,
+      "units": 342,
+      "battles": 2,
+      "projectiles": 39,
+      "bytes": 17528,
+      "gzipBytes": 3700
+    },
+    {
+      "seconds": 60,
+      "units": 376,
+      "battles": 2,
+      "projectiles": 17,
+      "bytes": 18067,
+      "gzipBytes": 3577
+    },
+    {
+      "seconds": 70,
+      "units": 405,
+      "battles": 1,
+      "projectiles": 0,
+      "bytes": 18678,
+      "gzipBytes": 3620
+    },
+    {
+      "seconds": 80,
+      "units": 435,
+      "battles": 1,
+      "projectiles": 5,
+      "bytes": 20212,
+      "gzipBytes": 4072
+    },
+    {
+      "seconds": 90,
+      "units": 469,
+      "battles": 3,
+      "projectiles": 40,
+      "bytes": 23148,
+      "gzipBytes": 4936
+    },
+    {
+      "seconds": 100,
+      "units": 481,
+      "battles": 1,
+      "projectiles": 13,
+      "bytes": 22795,
+      "gzipBytes": 4742
+    },
+    {
+      "seconds": 110,
+      "units": 501,
+      "battles": 0,
+      "projectiles": 0,
+      "bytes": 22875,
+      "gzipBytes": 4626
+    },
+    {
+      "seconds": 120,
+      "units": 536,
+      "battles": 0,
+      "projectiles": 0,
+      "bytes": 24428,
+      "gzipBytes": 4958
+    }
+  ],
+  "peakSnapshotBytes": 24428,
+  "peakCompressedBytes": 4958,
+  "peakOutboundMbps": 11.72544,
+  "peakCompressedOutboundMbps": 2.37984
+}

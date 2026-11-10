@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { createMap, mapBounds, inside, CELL_AREA, MAP_SIZES } from '../src/sim/map.ts';
+import { createMap, mapBounds, inside, CELL_AREA, MAP_SIZES, coastalCells, distance } from '../src/sim/map.ts';
 import { polygonArea, formation, fortPosition, SOLDIER_SIZE, battleFrame } from '../src/sim/spatial.ts';
-import { decorations, buildingWidth, appear, revealedLine, UNIT_WEAPONS } from '../src/render/art.ts';
+import { decorations, buildingWidth, appear, revealedLine, UNIT_WEAPONS, ARMY_PORTRAITS, unitFrame, portraitFrame } from '../src/render/art.ts';
+import { FACTION_COLORS } from '../src/sim/types.ts';
 import { createWorld, connect, trainingBattle } from '../src/sim/world.ts';
 import { routeGeometry } from '../src/render/geometry.ts';
 
@@ -18,12 +19,47 @@ test('40/60/80 irregular tiles keep the same average area and unit/building scal
     assert.ok(cells.some(p => p.polygon.length !== 6));
     for (const p of cells) {
       assert.equal(battleFrame(p).scale, .12); assert.equal(SOLDIER_SIZE, 2.7);
-      for (const n of p.neighbors) assert.equal(p.polygon.filter(a => cells[n].polygon.some(b => Math.hypot(a.x - b.x, a.y - b.y) < .01)).length, 2);
+      for (const n of p.neighbors) assert.ok(p.polygon.filter(a => cells[n].polygon.some(b => Math.hypot(a.x - b.x, a.y - b.y) < .01)).length >= 2);
       assert.ok(formation(p, 60).every(point => inside(point, p.polygon)));
       p.building = 'hq'; const fort = fortPosition(p), size = buildingWidth(p) / 2;
       for (const dx of [-size, size]) for (const dy of [-size, size]) assert.ok(inside({ x: fort.x + dx, y: fort.y + dy }, p.polygon));
     }
   }
+});
+
+test('wavy borders share the same sampled curve and keep each side selectable without gaps', () => {
+  const cells = createMap(40, 4521), edges = new Map();
+  const key = p => `${p.x.toFixed(6)},${p.y.toFixed(6)}`;
+  for (const p of cells) {
+    assert.ok(p.polygon.length > 20);
+    p.polygon.forEach((a, i) => {
+      const b = p.polygon[(i + 1) % p.polygon.length], id = [key(a), key(b)].sort().join('/'), edge = edges.get(id) ?? { a, b, owners: [] };
+      edge.owners.push(p.id); edges.set(id, edge);
+    });
+  }
+  let checked = 0;
+  for (const { a, b, owners } of edges.values()) {
+    assert.ok(owners.length <= 2);
+    if (owners.length !== 2 || Math.hypot(a.x - b.x, a.y - b.y) < .1) continue;
+    assert.ok(cells[owners[0]].neighbors.includes(owners[1]));
+    const length = Math.hypot(b.x - a.x, b.y - a.y), middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    for (const sign of [-1, 1]) {
+      const point = { x: middle.x - (b.y - a.y) / length * .01 * sign, y: middle.y + (b.x - a.x) / length * .01 * sign };
+      assert.equal(owners.filter(id => inside(point, cells[id].polygon)).length, 1);
+    }
+    checked++;
+  }
+  assert.ok(checked > 300);
+});
+
+test('seeded map outlines include rectangular, elliptical, wide and tall landmasses', () => {
+  const shapes = Array.from({ length: 12 }, (_, i) => {
+    const cells = createMap(40, i + 1), b = mapBounds(cells), area = cells.reduce((sum, p) => sum + polygonArea(p.polygon), 0);
+    assert.ok(cells.every(p => inside(p, p.polygon)));
+    return { fill: area / (b.width * b.height), aspect: b.width / b.height };
+  });
+  assert.ok(shapes.some(s => s.fill > .9)); assert.ok(shapes.some(s => s.fill < .82));
+  assert.ok(shapes.some(s => s.aspect > 1.5)); assert.ok(shapes.some(s => s.aspect < .7));
 });
 
 test('single decor sprites, scattered or clustered, stay entirely within their own tile', () => {
@@ -63,4 +99,22 @@ test('training deployments also fit the smaller fixed tile at every supported ba
     const id = trainingBattle(w, { weapon: 'launcher', ammo: 'round', effects: [] }, amount), p = w.provinces[id];
     assert.ok(w.battles[0].reserve.every(s => inside(s.position!, p.polygon)));
   }
+});
+
+test('one to five AI start inland with distinct headquarters, colors and a neighboring mine', () => {
+  for (const count of [40, 60, 80]) for (const enemies of [1, 2, 3, 4, 5]) for (const seed of [1, 5, 9, 4521]) {
+    const w = createWorld({ seed, count, enemies, difficulty: 'normal' }), coast = coastalCells(w.provinces), headquarters = w.factions.map(f => w.provinces[f.hq]);
+    assert.equal(w.factions.length, enemies + 1); assert.equal(new Set(headquarters.map(p => p.id)).size, enemies + 1);
+    assert.equal(new Set(w.factions.map(f => f.color)).size, enemies + 1);
+    for (const p of headquarters) { assert.ok(!coast.has(p.id), `${count}/${seed}/${enemies}: coastal HQ`); assert.ok(p.neighbors.some(id => w.provinces[id].owner === p.owner && w.provinces[id].building === 'mine')); assert.equal(p.troops.length, 40); }
+    for (const p of headquarters) for (const q of headquarters) if (p.id !== q.id) assert.ok(distance(p, q) > 50);
+  }
+});
+
+test('soldier and army portrait atlases cover all six factions and the sword icon', () => {
+  const image = readFileSync(new URL('../public/assets/b-style/soldiers.png', import.meta.url)), frames = image.readUInt32BE(16) / 160 * image.readUInt32BE(20) / 160;
+  const portraits = readFileSync(new URL('../public/assets/b-style/army-portraits.png', import.meta.url));
+  assert.equal(frames, FACTION_COLORS.length * UNIT_WEAPONS.length * 4); assert.equal(portraits.readUInt32BE(16), ARMY_PORTRAITS.length * 32);
+  const unit = { owner: 5, weapon: 'hilt', ammo: 'blade', effects: [] };
+  assert.ok(unit.owner * 24 + unitFrame(unit, 1) < frames); assert.equal(ARMY_PORTRAITS[portraitFrame(unit)], 'sword');
 });

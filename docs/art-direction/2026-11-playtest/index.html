@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ForgeFront · 试玩反馈调整</title>
+<style>body{margin:32px auto;max-width:1328px;padding:0 20px;font:16px/1.7 system-ui,'Microsoft YaHei';background:#f7f8ef;color:#254b4e}img{display:block;width:100%;height:auto;border:1px solid #d2deca;border-radius:8px}h1{font-size:28px}h2{margin-top:36px}a{color:#247c7d}.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{margin:0}figcaption{margin:8px 0}@media(max-width:640px){.pair{grid-template-columns:1fr}}</style>
+<h1>试玩反馈调整 · 历史记录</h1><p>激光枪现已删除，此页保留上一轮演示。<a href="../2026-11-artillery/index.html">查看当前实现</a></p><p>Shift 拖动箭头派出所选部队的一半，奇数向上取整；普通拖动仍派出全部。可以拆分正在行军的部队。游戏内不添加说明文字。</p>
+<h2>步枪与激光枪</h2><p>实体弹飞向目标；激光直接连接当前枪口与命中点，显示蓝白亮芯和接触光斑。以下为实际战斗与绘制逻辑离线导出的循环动画，伤害规则不变。</p>
+<div class="pair"><figure><img src="../2026-11-ui-refinement/effect-rifle.gif" alt="步枪循环动画"><figcaption>步枪</figcaption></figure><figure><img src="../2026-11-ui-refinement/effect-laser.gif" alt="激光枪循环动画"><figcaption>激光枪</figcaption></figure></div>
+<h2>紧凑两列图卡</h2><p>建造、武器、配件图卡继续使用 SVG。截图由当前 GameUI 的 HTML 与 CSS 渲染。</p><img src="../2026-11-ui-refinement/ui-review.png" alt="两列建造和产出卡片">
+<h2>波浪边界</h2><p>共享边界与海岸使用连续曲线，地块关系和平均面积保持不变；视觉边界与选中范围一致。图片由当前地图生成及地形、边界绘制逻辑离线导出。</p><img src="map-overview.png" alt="波浪边界地图全景"><h2>边界细节</h2><img src="map-border-detail.png" alt="波浪边界局部放大">
+<p><a href="../2026-11-ui-refinement/comparison.html">图卡体积对照与全部武器、配件动画</a></p></html>

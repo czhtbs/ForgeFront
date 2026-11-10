@@ -87,13 +87,6 @@ test('burn and frost apply battlefield effects, and trail leaves separate points
   assert.ok(trail.w.fields.length >= 3); assert.ok(new Set(trail.w.fields.map(f => Math.floor(f.x))).size >= 3);
 });
 
-test('beam attacks remain connected, pierce works, and a destroyed source stops the beam', () => {
-  const { w, shooter, enemies } = range(['pierce'], [[8, 0], [14, 0]], 'beam');
-  stepAttacks(w); assert.ok(enemies.every(s => s.hp < 1000)); assert.ok(w.visuals.some(v => v.kind === 'beam'));
-  shooter.position.y = 2; shots(w, .15); assert.ok(w.visuals.some(v => v.kind === 'beam' && v.y === 2));
-  shooter.hp = 0; stepAttacks(w); assert.equal(w.projectiles.length, 0);
-});
-
 test('melee enchantments only add damage to direct victims and pierce is the only multi-hit behavior', () => {
   for (const pierce of [false, true]) {
     const w = quiet(), p = w.provinces[0], b = addBattle(w, p.id, []);
@@ -102,7 +95,9 @@ test('melee enchantments only add damage to direct victims and pierce is the onl
     const enemies = [fighter(1, 130, 100, 'launcher'), fighter(1, 130, 110, 'launcher'), fighter(1, 130, 90, 'launcher')];
     b.fighters = [attacker, ...enemies]; stepBattle(w, b);
     assert.equal(enemies.filter(s => s.hp < 1000).length, pierce ? 3 : 1);
-    assert.equal(w.fields.length, 0); assert.equal(w.projectiles.length, 0); assert.ok(!w.visuals.some(v => v.kind === 'blast' || v.kind === 'arc'));
+    assert.equal(w.fields.length, 0); assert.equal(w.projectiles.length, 0);
+    assert.equal(w.visuals.filter(v => v.kind === 'blast').length, pierce ? 3 : 1);
+    assert.equal(w.visuals.filter(v => v.kind === 'arc').length, pierce ? 3 : 1);
     assert.ok(enemies.every(s => !s.chill && !s.frozen));
   }
 });
@@ -166,8 +161,8 @@ test('each accessory lifecycle terminates without creating recursive projectiles
   }
 });
 
-test('full ranged combinations expire for entity and beam ammunition', () => {
-  for (const ammo of ['round', 'beam']) {
+test('full ranged combinations expire for entity ammunition', () => {
+  for (const ammo of ['round']) {
     const { w } = range(Object.keys(EFFECTS).filter(e => e !== 'lob'), [[10, 0], [15, 4]], ammo);
     shots(w, 20); assert.equal(w.projectiles.length, 0, ammo); assert.equal(w.fields.length, 0, ammo);
   }

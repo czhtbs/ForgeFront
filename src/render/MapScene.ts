@@ -4,25 +4,28 @@ import { FACTION_COLORS, FORT } from '../sim/types.ts';
 import { distance, inside, randomSource, movementPath, mapBounds } from '../sim/map.ts';
 import { localTroops, configuredItems, marchPath, allTroops, supplyConflict } from '../sim/world.ts';
 import { canFight, configuration, unitKey, isWorkshop, EFFECTS, ARTILLERY_MIN, ARTILLERY_MAX } from '../content/equipment.ts';
-import { battleFrame, SOLDIER_SIZE } from '../sim/spatial.ts';
-import { orderGesture } from '../ui/interaction.ts';
+import { battleFrame, SOLDIER_SIZE, troopCenter } from '../sim/spatial.ts';
+import { attackTargets } from '../sim/attacks.ts';
+import { orderGesture, boxUnits, commandUnits } from '../ui/interaction.ts';
 import { lineDistance, routeGeometry, editedWaypoints, lineLength, pointAlong, supplyLanes, ROUTE_COLORS, routeNumber, commandRibbon, attackDestination } from './geometry.ts';
-import { buildingWidth, decorations, spriteWeapon, UNIT_WEAPONS, unitFrame, appear, unitDetail, revealedLine, deathFragments } from './art.ts';
+import { buildingWidth, decorations, unitFrame, portraitFrame, swordPose, appear, unitDetail, revealedLine, deathFragments } from './art.ts';
 import { drawTerrain, terrainCanvasSize } from './terrain.ts';
+import { drawDamageEffects, lightning } from './damageEffects.ts';
 const vectors = (points: Point[]) => points.map(p => new Phaser.Math.Vector2(p.x, p.y));
-export interface MapActions { select(id: number): void; selectUnits(ids: number[], additive: boolean, province?: number): void; order(to: number, ids: number[]): void; bombard(to: number, ids: number[], point: Point): void; connect(from: number, to: number): void; waypoint(route: number, via: Waypoint[]): void; remove(route: number): void }
+const armyKey = (s: Soldier) => `${unitKey(s)}${s.bombard ? `/artillery:${s.bombard.point.x},${s.bombard.point.y}` : ''}`;
+export interface MapActions { select(id: number): void; selectUnits(ids: number[], additive: boolean, province?: number): void; order(to: number, ids: number[], point?: Point, targets?: number[]): void; connect(from: number, to: number): void; waypoint(route: number, via: Waypoint[]): void; remove(route: number): void }
 interface UnitView { root: Phaser.GameObjects.Image }
 interface ArmyIcon { root: Phaser.GameObjects.Container; portrait: Phaser.GameObjects.Image }
 interface GroupHit { point: Point; province: number; ids: number[]; owner: number; shipment?: number; radius?: number }
-interface Drag { kind: 'pan' | 'army' | 'connect' | 'route'; from: number; ids?: number[]; clicked?: number[]; shipment?: number; time: number; route?: number; index?: number; moving?: boolean; original?: Point[]; x: number; y: number; sx: number; sy: number }
+interface Drag { kind: 'pan' | 'select' | 'army' | 'connect' | 'route'; from: number; ids?: number[]; clicked?: number[]; additive?: boolean; moved?: boolean; shipment?: number; time: number; route?: number; index?: number; moving?: boolean; original?: Point[]; x: number; y: number; sx: number; sy: number }
 export class MapScene extends Phaser.Scene {
   world!: World;
+  player = 0;
   selected = -1;
   selectedUnits = new Set<number>();
   selectedRoute = -1;
   selectedWaypoint = -1;
   enabled = false;
-  bombardMode = false;
   actions!: MapActions;
   fps = 0;
   visibleUnits = 0;
@@ -34,6 +37,8 @@ export class MapScene extends Phaser.Scene {
   private stains!: Phaser.GameObjects.Graphics;
   private ground?: Phaser.GameObjects.Image;
   private debris: Phaser.GameObjects.Image[] = [];
+  private damageSprites: Phaser.GameObjects.Image[] = [];
+  private damageIndex = 0;
   private labels: Phaser.GameObjects.Text[] = [];
   private labelIndex = 0;
   private polygons: Phaser.Math.Vector2[][] = [];
@@ -59,6 +64,7 @@ export class MapScene extends Phaser.Scene {
     this.load.spritesheet('army-portraits', 'assets/b-style/army-portraits.png', { frameWidth: 32, frameHeight: 40 });
     for (const kind of ['hq', 'barracks', 'workshop', 'mine', 'pine', 'tree', 'mountain']) this.load.image(kind, `assets/b-style/${kind}.png`);
     this.load.image('fort', 'assets/b-style/fort.png');
+    for (const kind of ['burst', 'flame', 'smoke', 'glow']) this.load.image(`fx-${kind}`, `assets/fx/${kind}.png`);
   }
   create() {
     this.textures.get('army-portraits').setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -71,7 +77,11 @@ export class MapScene extends Phaser.Scene {
     this.land = this.add.graphics().setDepth(.5); this.overlay = this.add.graphics().setDepth(1); this.stains = this.add.graphics().setDepth(1.2); this.effects = this.add.graphics().setDepth(5); this.commands = this.add.graphics().setDepth(5.5); this.icons = this.add.graphics().setDepth(6);
     this.input.mouse!.disableContextMenu();
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.pointerDown(p));
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (this.drag?.kind === 'pan' && p.isDown) { this.cameras.main.scrollX = this.drag.sx - (p.x - this.drag.x) / this.cameras.main.zoom; this.cameras.main.scrollY = this.drag.sy - (p.y - this.drag.y) / this.cameras.main.zoom; } });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!this.drag || !p.isDown) return;
+      this.drag.moved ||= Math.hypot(p.x - this.drag.x, p.y - this.drag.y) >= 6;
+      if (this.drag.kind === 'pan' && this.drag.moved) { this.cameras.main.scrollX = this.drag.sx - (p.x - this.drag.x) / this.cameras.main.zoom; this.cameras.main.scrollY = this.drag.sy - (p.y - this.drag.y) / this.cameras.main.zoom; }
+    });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.pointerUp(p));
     this.input.on('pointerupoutside', () => this.cancelDrag());
     this.game.events.on('blur', () => this.cancelDrag());
@@ -86,11 +96,17 @@ export class MapScene extends Phaser.Scene {
   }
   cancelDrag() { this.drag = undefined; }
   deleteSelected() {
-    const r = this.world.routes.find(r => r.id === this.selectedRoute); if (!this.enabled || !r || r.owner !== 0) return;
+    const r = this.world.routes.find(r => r.id === this.selectedRoute); if (!this.enabled || !r || r.owner !== this.player) return;
     if (this.selectedWaypoint >= 0) { this.actions.waypoint(r.id, r.via.filter((_, i) => i !== this.selectedWaypoint)); this.selectedWaypoint = -1; }
     else { this.actions.remove(r.id); this.selectedRoute = -1; }
   }
   private provinceAt(point: Point) { return this.world.provinces.find(p => inside(point, p.polygon)); }
+  private commandTarget(point: Point) {
+    const z = this.cameras.main.zoom, hit = [...this.groupHits, ...this.unitHits].filter(h => h.owner !== this.player && distance(h.point, point) * z < (h.radius ? h.radius * z : 23)).sort((a, b) => distance(a.point, point) - distance(b.point, point))[0];
+    const targets = hit ? attackTargets(this.world).filter(t => hit.ids.includes(t.unit.id) && t.unit.hp > 0) : [];
+    const aim = targets[0]?.point ?? point;
+    return { point: aim, province: this.provinceAt(aim), ids: targets.map(t => t.unit.id) };
+  }
   private fortPoint(p: Province) { const frame = battleFrame(p); return { x: frame.x + FORT.x * frame.scale, y: frame.y + FORT.y * frame.scale }; }
   private routePoints(route: Route, via: Waypoint[] = route.via) {
     return routeGeometry(this.world, route, via);
@@ -102,45 +118,59 @@ export class MapScene extends Phaser.Scene {
     if (pointer.rightButtonDown()) { this.drag = { ...base, kind: 'pan' }; return; }
     if (!pointer.leftButtonDown()) return;
     const p = this.provinceAt(point);
-    if (this.bombardMode) {
-      const hit = [...this.groupHits, ...this.unitHits].find(h => h.owner !== 0 && distance(h.point, point) * c.zoom < 23);
-      const unit = hit && allTroops(this.world).find(s => hit.ids.includes(s.id)), aim = unit?.position ?? point, province = this.provinceAt(aim);
-      if (province) this.actions.bombard(province.id, [...this.selectedUnits], aim); return;
-    }
-    for (const r of this.world.routes.filter(r => r.owner === 0 && r.id === this.selectedRoute)) {
+    for (const r of this.world.routes.filter(r => r.owner === this.player && r.id === this.selectedRoute)) {
       const i = r.via.findIndex(v => distance(v, point) * c.zoom < 12);
       if (i >= 0) { this.selectedRoute = r.id; this.selectedWaypoint = i; this.drag = { ...base, kind: 'route', route: r.id, index: i, moving: true, original: this.routePoints(r).map(v => v.point) }; return; }
     }
-    const factory = this.world.provinces.find(p => p.owner === 0 && isWorkshop(p.building) && distance(this.fortPoint(p), point) < buildingWidth(p) / 2);
-    if (factory) { this.actions.select(factory.id); this.drag = { ...base, kind: 'connect', from: factory.id }; return; }
+    const factory = this.world.provinces.find(p => p.owner === this.player && (isWorkshop(p.building) || p.building === 'hq' || p.building === 'barracks') && distance(this.fortPoint(p), point) < buildingWidth(p) / 2);
+    if (factory) {
+      this.drag = { ...base, kind: this.selected === factory.id && !this.selectedUnits.size ? 'connect' : 'select', from: factory.id, additive: pointer.event.ctrlKey };
+      return;
+    }
     const hit = [...this.groupHits, ...this.unitHits].map(h => ({ ...h, distance: distance(h.point, point) * c.zoom })).filter(h => h.radius ? h.distance <= h.radius * c.zoom : Math.abs(h.point.x - point.x) * c.zoom <= 22 && (point.y - h.point.y) * c.zoom >= -22 && (point.y - h.point.y) * c.zoom <= 42).sort((a,b) => a.distance - b.distance)[0];
     if (hit) {
-      if (pointer.event.ctrlKey) { if (hit.owner === 0) this.actions.selectUnits(hit.ids, true, hit.province); return; }
-      if (!hit.ids.every(id => this.selectedUnits.has(id))) this.actions.selectUnits(hit.ids, false, hit.province);
-      if (hit.owner === 0) this.drag = { ...base, kind: 'army', from: hit.province, ids: [...this.selectedUnits], clicked: hit.ids, shipment: hit.shipment };
-      else this.actions.selectUnits(hit.ids, false, hit.province);
+      const command = hit.owner === this.player && !pointer.event.ctrlKey;
+      if (command && !hit.ids.every(id => this.selectedUnits.has(id))) this.actions.selectUnits(hit.ids, false, hit.province);
+      this.drag = { ...base, kind: command ? 'army' : 'select', from: hit.province, ids: [...this.selectedUnits], clicked: hit.ids, shipment: hit.shipment, additive: hit.owner === this.player && pointer.event.ctrlKey };
       return;
     }
     const line = this.lineHits.map(h => ({ ...h, d: lineDistance(point, h.a, h.b) * c.zoom })).filter(h => h.d < 9).sort((a, b) => a.d - b.d)[0];
     if (line) { const r = this.world.routes.find(r => r.id === line.route)!; this.selectedRoute = r.id; this.selectedWaypoint = -1; this.drag = { ...base, kind: 'route', route: r.id, index: line.insert, moving: false, original: this.lineHits.filter(h => h.route === r.id).flatMap(h => [h.a, h.b]) }; return; }
-    this.actions.select(p?.id ?? -1);
-    if (p) this.drag = { ...base, kind: 'army', from: p.id, ids: localTroops(this.world, p.id, 0).filter(canFight).map(s => s.id) };
+    this.drag = { ...base, kind: 'select', from: p?.id ?? -1, additive: pointer.event.ctrlKey };
   }
   private pointerUp(pointer: Phaser.Input.Pointer) {
-    const d = this.drag; this.drag = undefined; if (!d || !this.enabled || d.kind === 'pan') return;
-    if (!orderGesture(Math.hypot(pointer.x - d.x, pointer.y - d.y), performance.now() - d.time)) { if (d.clicked) this.actions.selectUnits(d.clicked, false, d.from); return; }
+    const d = this.drag; this.drag = undefined; if (!d || !this.enabled) return;
+    const moved = d.moved || Math.hypot(pointer.x - d.x, pointer.y - d.y) >= 6;
+    if (d.kind === 'pan') { if (!moved) this.actions.select(-1); return; }
     if ((pointer.event.target as HTMLElement)?.closest('#sidebar, #line-tools, #menu')) return;
-    const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y), p = this.provinceAt(point); if (!p) return;
-    if (d.kind === 'army' && p.id !== d.from) this.actions.order(p.id, d.ids!);
-    if (d.kind === 'connect') this.actions.connect(d.from, p.id);
+    if (d.kind === 'select') {
+      if (moved) {
+        const camera = this.cameras.main, ids = boxUnits([...this.groupHits, ...this.unitHits], camera.getWorldPoint(d.x, d.y), camera.getWorldPoint(pointer.x, pointer.y), this.player);
+        this.actions.selectUnits(d.additive ? [...new Set([...this.selectedUnits, ...ids])] : ids, false);
+      } else if (d.clicked) this.actions.selectUnits(d.clicked, !!d.additive, d.from);
+      else this.actions.select(d.from);
+      return;
+    }
+    if (!orderGesture(Math.hypot(pointer.x - d.x, pointer.y - d.y), performance.now() - d.time)) { if (d.clicked) this.actions.selectUnits(d.clicked, false, d.from); return; }
+    const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y), command = this.commandTarget(point), p = d.kind === 'army' ? command.province : this.provinceAt(point); if (!p) return;
+    if (d.kind === 'army' && (p.id !== d.from || command.ids.length)) {
+      const ids = commandUnits(d.ids!, pointer.event.shiftKey);
+      if (pointer.event.shiftKey) this.actions.selectUnits(ids, false, d.from);
+      this.actions.order(p.id, ids, command.ids.length ? command.point : this.fortPoint(p), command.ids);
+    }
+    if (d.kind === 'connect' && p.id !== d.from) this.actions.connect(d.from, p.id);
     if (d.kind === 'route') {
       const r = this.world.routes.find(r => r.id === d.route); if (!r) return;
       if (!d.moving && d.original!.some((a, i, points) => i && lineDistance(point, points[i - 1], a) * this.cameras.main.zoom <= 8)) return;
       this.actions.waypoint(r.id, editedWaypoints(r.via, { x: point.x, y: point.y, province: p.id }, d.index!, !!d.moving));
     }
   }
+  restore(world: World) {
+    this.world = world; this.stamp = -1; this.cancelDrag(); this.unitMotion.clear(); this.routeBirth.clear();
+    this.ownership = new Map(world.provinces.map(p => [p.id, { owner: p.owner, previous: p.owner, changed: -10 }]));
+  }
   reset(world: World) {
-    this.bombardMode = false; this.world = world; this.stamp = -1; this.selected = -1; this.selectedUnits.clear(); this.selectedRoute = -1; this.selectedWaypoint = -1; this.cancelDrag();
+    this.world = world; this.stamp = -1; this.selected = -1; this.selectedUnits.clear(); this.selectedRoute = -1; this.selectedWaypoint = -1; this.cancelDrag();
     this.routeBirth.clear(); this.unitMotion.clear(); this.ownership = new Map(world.provinces.map(p => [p.id, { owner: p.owner, previous: p.owner, changed: -10 }]));
     if (!this.ready) return;
     if (this.ground) { this.ground.destroy(); this.textures.remove('ground'); }
@@ -177,10 +207,9 @@ export class MapScene extends Phaser.Scene {
       icon = { root, portrait }; this.armyIcons.push(icon);
     }
     icon.root.setVisible(true).setPosition(x, y).setScale(1 / z);
-    icon.portrait.setFrame(UNIT_WEAPONS.indexOf(canFight(s) ? spriteWeapon(s) : 'none'));
+    icon.portrait.setFrame(portraitFrame(s));
     const marks = s.effects.slice(0, 2).map(e => EFFECTS[e].name[0]).join('') + (s.effects.length > 2 ? `+${s.effects.length - 2}` : '');
     if (marks) this.text({ x, y: y - 30 / z }, marks, '#294e5b', 10);
-    if (s.weapon === 'hilt') this.text({ x, y }, '剑', '#48545c', 18);
     this.text({ x, y: y + 27 / z }, `${count}`, '#244959', 12);
     if (s.recruit) { g.fillStyle(canFight(s) ? 0xe0b34e : 0x9ba694); g.fillRect(x - 18 / z, y - 22 / z, 5 / z, 5 / z); }
   }
@@ -217,7 +246,7 @@ export class MapScene extends Phaser.Scene {
   private drawUnits(troops: Soldier[], province: number, index: number, shipment?: number) {
     const camera = this.cameras.main, view = camera.worldView, g = this.effects;
     const groups = new Map<string, number[]>();
-    for (const unit of shipment === undefined ? localTroops(this.world, province) : troops) { const key = `${unit.owner}/${unitKey(unit)}`, ids = groups.get(key) ?? []; ids.push(unit.id); groups.set(key, ids); }
+    for (const unit of shipment === undefined ? localTroops(this.world, province) : troops) { const key = `${unit.owner}/${armyKey(unit)}`, ids = groups.get(key) ?? []; ids.push(unit.id); groups.set(key, ids); }
     for (const unit of troops) {
       const p = unit.position!;
       if (p.x < view.left - SOLDIER_SIZE || p.x > view.right + SOLDIER_SIZE || p.y < view.top - SOLDIER_SIZE || p.y > view.bottom + SOLDIER_SIZE) continue;
@@ -226,10 +255,16 @@ export class MapScene extends Phaser.Scene {
       if (!motion) { motion = { soldier: unit, born: this.clock, seen: this.clock }; this.unitMotion.set(unit.id, motion); }
       motion.soldier = { ...unit, position: { ...p } }; motion.seen = this.clock;
       sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setScale(SOLDIER_SIZE / 60).setRotation(angle).setFrame(unit.owner * 24 + unitFrame(unit, recoil)).setAlpha(appear(this.clock - motion.born, .28) * unitDetail(camera.zoom));
-      this.unitHits.push({ point: p, province, ids: groups.get(`${unit.owner}/${unitKey(unit)}`)!, owner: unit.owner, shipment, radius: SOLDIER_SIZE * .7 });
-      if (unit.weapon === 'hilt') { g.lineStyle(.65, 0xe2e5da); g.lineBetween(p.x + Math.cos(angle), p.y + Math.sin(angle), p.x + Math.cos(angle) * 3.5, p.y + Math.sin(angle) * 3.5); }
+      this.unitHits.push({ point: p, province, ids: groups.get(`${unit.owner}/${armyKey(unit)}`)!, owner: unit.owner, shipment, radius: SOLDIER_SIZE * .7 });
+      if (unit.weapon === 'hilt') {
+        const sword = swordPose(unit, recoil);
+        g.lineStyle(.6, 0x3e5359); g.lineBetween(sword.grip.x, sword.grip.y, sword.tip.x, sword.tip.y);
+        g.lineStyle(.3, 0xe2eeee); g.lineBetween(sword.grip.x, sword.grip.y, sword.tip.x, sword.tip.y);
+        g.lineStyle(.4, 0xc6a66a); g.lineBetween(sword.guardA.x, sword.guardA.y, sword.guardB.x, sword.guardB.y);
+        g.lineStyle(.4, 0x746047); g.lineBetween(sword.pommel.x, sword.pommel.y, sword.grip.x, sword.grip.y);
+      }
       if (this.selectedUnits.has(unit.id)) { this.overlay.lineStyle(2 / camera.zoom, 0xffe08a); this.overlay.strokeCircle(p.x, p.y, SOLDIER_SIZE * .6); }
-      if (recoil > .6 && unit.weapon !== 'hilt' && unit.ammo !== 'beam') { g.fillStyle(0xffd36a, recoil); g.fillCircle(p.x + Math.cos(angle) * SOLDIER_SIZE * 1.1, p.y + Math.sin(angle) * SOLDIER_SIZE * 1.1, SOLDIER_SIZE / 7); }
+      if (recoil > .6 && unit.weapon !== 'hilt') { g.fillStyle(0xffd36a, recoil); g.fillCircle(p.x + Math.cos(angle) * SOLDIER_SIZE * 1.1, p.y + Math.sin(angle) * SOLDIER_SIZE * 1.1, SOLDIER_SIZE / 7); }
     }
     return index;
   }
@@ -265,28 +300,39 @@ export class MapScene extends Phaser.Scene {
   private drawBattle(b: Battle, index: number) {
     return b.models && unitDetail(this.cameras.main.zoom) ? this.drawUnits(b.fighters, b.province, index) : index;
   }
+  private stampEffect(texture: string, x: number, y: number, width: number, height: number, tint: number, alpha: number, angle = 0) {
+    const view = this.cameras.main.worldView;
+    if (x + width < view.left || x - width > view.right || y + height < view.top || y - height > view.bottom) return;
+    let sprite = this.damageSprites[this.damageIndex++];
+    if (!sprite) { sprite = this.add.image(0, 0, `fx-${texture}`).setDepth(5.8); this.damageSprites.push(sprite); }
+    sprite.setTexture(`fx-${texture}`).setVisible(true).setPosition(x, y).setDisplaySize(width, height).setTint(tint).setAlpha(alpha).setRotation(angle);
+  }
   private drawAttacks() {
     const g = this.icons, z = this.cameras.main.zoom;
-    for (const f of this.world.fields) {
-      const color = f.kind === 'burn' ? 0xf49b43 : f.kind === 'frost' ? 0x69d5e9 : f.kind === 'arc' ? 0x9c8cfa : 0xcdb067;
-      g.fillStyle(color, .2); g.fillCircle(f.x, f.y, f.radius); g.lineStyle(.5, color, .6); g.strokeCircle(f.x, f.y, f.radius);
-    }
+    this.damageIndex = 0;
+    drawDamageEffects(this.world, g, (...args) => this.stampEffect(...args));
     for (const p of this.world.projectiles) {
-      if (p.ammo === 'beam') continue;
       const lob = p.airborne, total = Math.max(1, distance(p.origin, p.aim)), progress = Math.min(1, distance(p.origin, p) / total), lift = lob && p.phase === 'flight' ? Math.sin(progress * Math.PI) * 25 : 0;
       g.fillStyle(0x324c4b, .25); if (lob) g.fillCircle(p.x, p.y, 2 / z);
-      g.lineStyle(lob ? 2 / z : .6, p.effects.includes('frost') ? 0x82dcee : p.effects.includes('arc') ? 0xa59bff : 0xffd37d);
-      g.lineBetween(p.x, p.y - lift, p.x - p.vx * .035, p.y - lift - p.vy * .035);
+      if (p.effects.includes('arc')) {
+        const angle = Math.atan2(p.vy, p.vx), length = Math.min(6, distance(p.origin, p));
+        lightning(g, { x: p.x - Math.cos(angle) * length, y: p.y - lift - Math.sin(angle) * length }, { x: p.x, y: p.y - lift }, Math.floor(this.world.time * 18) + p.id, 1);
+      } else {
+        g.lineStyle(lob ? 2 / z : .6, p.effects.includes('frost') ? 0x82dcee : 0xffd37d);
+        g.lineBetween(p.x, p.y - lift, p.x - p.vx * .035, p.y - lift - p.vy * .035);
+      }
       if (p.phase !== 'flight') { g.lineStyle(1 / z, 0xe4ac4f); g.strokeCircle(p.x, p.y, 3 / z); }
     }
     for (const v of this.world.visuals) {
       const alpha = v.life / v.max;
-      if (v.kind === 'beam' || v.kind === 'arc') { g.lineStyle(v.kind === 'beam' ? 1.1 : .65, v.kind === 'beam' ? 0xffe69d : 0x9d9aff, alpha); g.lineBetween(v.x, v.y, v.target!.x, v.target!.y); }
-      else if (v.kind === 'blast') { g.fillStyle(0xf3a958, alpha * .55); g.fillCircle(v.x, v.y, (1 - alpha) * 10); }
-      else { g.fillStyle(v.kind === 'fort-hit' ? 0xe5c27c : 0xb24b3f, alpha); g.fillCircle(v.x, v.y, .7); }
+      if (['arc', 'blast', 'flame', 'frost'].includes(v.kind)) continue;
+      g.fillStyle(v.kind === 'fort-hit' ? 0xe5c27c : 0xb24b3f, alpha); g.fillCircle(v.x, v.y, .7);
     }
-    if (this.bombardMode) for (const unit of allTroops(this.world).filter(s => this.selectedUnits.has(s.id) && s.effects.includes('lob'))) {
-      const point = unit.position!; g.lineStyle(1 / z, 0xe49b49, .6); g.strokeCircle(point.x, point.y, ARTILLERY_MIN); g.lineStyle(1 / z, 0x599d83, .7); g.strokeCircle(point.x, point.y, ARTILLERY_MAX);
+    for (let i = this.damageIndex; i < this.damageSprites.length; i++) this.damageSprites[i].setVisible(false);
+    const troops = allTroops(this.world);
+    for (const hit of this.groupHits) {
+      const guns = troops.filter(s => hit.ids.includes(s.id) && this.selectedUnits.has(s.id) && s.effects.includes('lob')); if (!guns.length) continue;
+      const point = troopCenter(guns); g.lineStyle(1 / z, 0xe49b49, .6); g.strokeCircle(point.x, point.y, ARTILLERY_MIN); g.lineStyle(1 / z, 0x599d83, .7); g.strokeCircle(point.x, point.y, ARTILLERY_MAX);
     }
   }
   update() {
@@ -304,7 +350,7 @@ export class MapScene extends Phaser.Scene {
     const detail = unitDetail(z); this.effects.setAlpha(detail); this.stains.setAlpha(detail);
     if (!this.world.routes.some(r => r.id === this.selectedRoute)) { this.selectedRoute = -1; this.selectedWaypoint = -1; }
     for (const id of this.routeBirth.keys()) if (!this.world.routes.some(r => r.id === id)) this.routeBirth.delete(id);
-    for (const { r, points: full, highlighted } of supplyLanes(this.world, this.selected, z)) {
+    for (const { r, points: full, highlighted } of supplyLanes(this.world, this.selected, z, this.player)) {
       if (!this.routeBirth.has(r.id)) this.routeBirth.set(r.id, { clock: this.clock, travel: 0, last: this.world.time });
       const birth = this.routeBirth.get(r.id)!, progress = appear(this.clock - birth.clock, .65);
       if (r.status === 'normal' || r.status === 'delayed') birth.travel += (this.world.time - birth.last) * (r.status === 'delayed' ? 12 : 24);
@@ -339,34 +385,36 @@ export class MapScene extends Phaser.Scene {
       if (p.id === this.selected) { g.lineStyle(5 / z, 0xffffff, pulse * .2); g.strokePoints(this.polygons[p.id], true); g.lineStyle(2 / z, 0xffffff, pulse); g.strokePoints(this.polygons[p.id], true); }
       const ownership = this.ownership.get(p.id)!;
       const age = this.clock - ownership.changed;
-      if (age < 1.2) { g.lineStyle((1 + age * 3) / z, 0xf5ebc7, 1 - age / 1.2); g.strokePoints(this.polygons[p.id], true); this.text({ x: p.x, y: p.y - 36 }, '领土易主', '#526d37', 13); }
+      if (age < 1.2) { g.lineStyle((1 + age * 3) / z, 0xf5ebc7, 1 - age / 1.2); g.strokePoints(this.polygons[p.id], true); }
       const size = buildingWidth(p), image = this.buildings[p.id];
       image.setTexture(isWorkshop(p.building) ? 'workshop' : p.building ?? 'fort').setPosition(fort.x, fort.y).setDepth(2 + (fort.y + size * .4) / 10000).setDisplaySize(size, size).clearTint();
-      if (isWorkshop(p.building)) { image.setTint(p.building === 'launcherWorks' ? 0xf5d19b : p.building === 'ammoWorks' ? 0xa6d8f2 : 0xc5b4ee); this.text({ x: fort.x, y: fort.y + size * .5 }, p.building === 'launcherWorks' ? '发射器' : p.building === 'ammoWorks' ? '弹药' : '配件', '#314e50', 10); }
-      if (p.hp <= 0) { image.setTint(0x777777); this.text({ x: fort.x, y: fort.y - size * .65 }, '瘫痪', '#b54e3a', 12); }
+      if (isWorkshop(p.building)) { image.setTint(p.building === 'launcherWorks' ? 0xf5d19b : 0xc5b4ee); this.text({ x: fort.x, y: fort.y + size * .5 }, p.building === 'launcherWorks' ? '发射器' : '配件', '#314e50', 10); }
+      if (p.hp <= 0) image.setTint(0x777777);
       if (p.id === this.selected || this.world.time - p.lastHit < 2) {
         const y = fort.y - size * .48; g.fillStyle(0x2c4745, .8); g.fillRect(fort.x - 30 / z, y, 60 / z, 6 / z); g.fillStyle(0x64b38b); g.fillRect(fort.x - 30 / z, y, 60 / z * Math.max(0, p.hp) / 1000, 6 / z);
       }
 
       const groups = new Map<string, Soldier[]>();
-      for (const s of localTroops(this.world, p.id).filter(canFight)) { const key = `${s.owner}/${unitKey(s)}`; const list = groups.get(key) ?? []; list.push(s); groups.set(key, list); }
+      for (const s of localTroops(this.world, p.id).filter(canFight)) { const key = `${s.owner}/${armyKey(s)}`; const list = groups.get(key) ?? []; list.push(s); groups.set(key, list); }
       let i = 0;
       for (const soldiers of groups.values()) {
         const first = soldiers[0], count = soldiers.length, col = i % 3, row = Math.floor(i / 3);
-        const point = { x: fort.x + (col - Math.min(groups.size - 1, 2) / 2) * 44 / z, y: b?.models && z > 2 ? p.y - 44 - row * 61 / z : fort.y - size * .6 - (row * 61 + 28) / z };
+        const deployed = soldiers.filter(s => s.bombard), center = deployed.length ? troopCenter(deployed) : fort;
+        const point = { x: center.x + (col - Math.min(groups.size - 1, 2) / 2) * 44 / z, y: deployed.length ? center.y - 35 / z : b?.models && z > 2 ? p.y - 44 - row * 61 / z : fort.y - size * .6 - (row * 61 + 28) / z };
+        if (deployed.length && distance(point, fort) < size / 2 + 24 / z) point.y = fort.y - size * .6 - (row * 61 + 28) / z;
         this.groupIcon(point, first, count, soldiers.some(s => this.selectedUnits.has(s.id)));
         this.groupHits.push({ point, province: p.id, ids: soldiers.map(s => s.id), owner: first.owner }); i++;
       }
       if (b) {
-        if (detail < 1) this.text({ x: fort.x, y: fort.y + size * .65 + 10 / z }, '交战中', '#b34e3c', 12);
         unitIndex = this.drawBattle(b, unitIndex);
-      }
+      } else if (detail) unitIndex = this.drawUnits([...p.troops, ...p.mobile].filter(s => s.bombard), p.id, unitIndex);
       
     }
     const marchIcons: Point[] = [];
     for (const s of this.world.shipments) {
+      if (s.transferRoute !== undefined) continue;
       const groups = new Map<string, Soldier[]>();
-      for (const unit of s.troops) { const key = unitKey(unit), list = groups.get(key) ?? []; list.push(unit); groups.set(key, list); }
+      for (const unit of s.troops) { const key = armyKey(unit), list = groups.get(key) ?? []; list.push(unit); groups.set(key, list); }
       let i = 0;
       for (const troops of groups.values()) {
         const point = { x: s.x + (i - (groups.size - 1) / 2) * 46 / z, y: s.y };
@@ -401,8 +449,14 @@ export class MapScene extends Phaser.Scene {
   private drawDrag() {
     const d = this.drag; if (!d || d.kind === 'pan') return;
     const pointer = this.input.activePointer;
+    if (d.kind === 'select') {
+      if (!d.moved && Math.hypot(pointer.x - d.x, pointer.y - d.y) < 6) return;
+      const c = this.cameras.main, a = c.getWorldPoint(d.x, d.y), b = c.getWorldPoint(pointer.x, pointer.y), g = this.commands;
+      g.fillStyle(0x41c6ac, .12); g.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+      g.lineStyle(1.5 / c.zoom, 0x41c6ac, .9); g.strokeRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(a.x - b.x), Math.abs(a.y - b.y)); return;
+    }
     if (!orderGesture(Math.hypot(pointer.x - d.x, pointer.y - d.y), performance.now() - d.time)) return;
-    const c = this.cameras.main, mouse = this.input.activePointer, point = c.getWorldPoint(mouse.x, mouse.y), target = this.provinceAt(point), g = this.overlay, z = c.zoom;
+    const c = this.cameras.main, mouse = this.input.activePointer, point = c.getWorldPoint(mouse.x, mouse.y), command = this.commandTarget(point), target = d.kind === 'army' ? command.province : this.provinceAt(point), g = this.overlay, z = c.zoom;
     let points: Point[] = [], valid = false;
     if (d.kind === 'route') {
       const r = this.world.routes.find(r => r.id === d.route); if (!r) return;
@@ -410,19 +464,24 @@ export class MapScene extends Phaser.Scene {
       const path = target ? this.routePoints(r, via) : []; valid = !!path.length;
       points = valid ? path.map(p => p.point) : [this.world.provinces[r.from], point, this.world.provinces[r.to]];
     } else if (d.kind === 'connect') {
-      valid = !!target && target.owner === 0 && ['hq', 'barracks'].includes(target.building ?? '') && !supplyConflict(this.world, d.from, target.id);
+      valid = !!target && target.owner === this.player && ['hq', 'barracks'].includes(target.building ?? '') && !supplyConflict(this.world, d.from, target.id);
       points = [this.fortPoint(this.world.provinces[d.from]), valid ? this.fortPoint(target!) : point];
     }
     else {
       const shipment = this.world.shipments.find(s => s.id === d.shipment);
-      const path = target ? shipment ? marchPath(this.world, shipment, target.id) : d.from >= 0 ? movementPath(this.world, d.from, target.id, 0) : [] : [];
+      const path = target ? shipment ? marchPath(this.world, shipment, target.id) : d.from >= 0 ? movementPath(this.world, d.from, target.id, this.player) : [] : [];
       valid = !!path.length && !!d.ids?.length;
       const start = shipment ?? (d.from >= 0 ? this.world.provinces[d.from] : point);
       points = path.length ? [start, ...path.slice(shipment && path.length > 1 ? 1 : 0).map(id => this.world.provinces[id])] : [start, point];
+      const troops = allTroops(this.world).filter(s => d.ids!.includes(s.id)), guns = troops.filter(s => s.effects.includes('lob'));
+      if (target && guns.length === troops.length && guns.length && (target.owner !== this.player || command.ids.length)) {
+        const center = troopCenter(guns), aim = command.ids.length ? command.point : this.fortPoint(target), range = distance(center, aim);
+        if (range <= ARTILLERY_MAX) { points = [center, aim]; valid = range >= ARTILLERY_MIN; }
+      }
     }
     if (target && valid) { g.lineStyle(3 / z, 0xf9e398); g.strokePoints(this.polygons[target.id], true); }
     if (d.kind === 'army' || d.kind === 'connect') {
-      const attack = d.kind === 'army' && !!target && attackDestination(this.world, target.id, 0);
+      const attack = d.kind === 'army' && !!target && (command.ids.length > 0 || attackDestination(this.world, target.id, this.player));
       this.drawCommand(points, attack, valid, d.kind === 'connect');
     } else { g.lineStyle(2.5 / z, valid ? 0x279c87 : 0xc56150); g.strokePoints(vectors(points), false); }
   }

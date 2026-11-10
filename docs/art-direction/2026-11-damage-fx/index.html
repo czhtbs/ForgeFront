@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>ForgeFront · 四种伤害特效前后对比</title>
+<style>
+body{max-width:1000px;margin:32px auto;padding:0 20px;background:#f7f8ef;color:#254b4e;font:16px/1.6 system-ui,"Microsoft YaHei"}
+h1{font-size:28px}h2{margin:36px 0 4px}p{color:#607462}.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{margin:0;background:#edf1e3;border:1px solid #cbd7c3;border-radius:8px;overflow:hidden}img{display:block;width:100%;height:auto}figcaption{padding:8px 12px}a{color:#237c7d}button{font:inherit;background:#fffdf4;border:1px solid #98b4a4;border-radius:5px;padding:6px 20px;color:#254b4e;cursor:pointer}@media(max-width:650px){.pair{grid-template-columns:1fr}}
+</style>
+<h1>四种伤害特效 · 前后动态对比</h1>
+<p>左侧为改动前，右侧为当前游戏绘制。均为 4 秒循环 GIF，复用实际战斗与绘制逻辑离线导出；不是浏览器实机录像。伤害、作用范围和持续时间没有改变。</p>
+<button type="button" id="restart">全部重播</button>
+<h2>炸药</h2><p>命中闪光、膨胀火团、冲击波、飞散火星和消散烟尘。</p>
+<div class="pair"><figure><img src="before/effect-blast.gif" alt="炸药改动前动画"><figcaption>改动前</figcaption></figure><figure><img src="../2026-11-ui-refinement/effect-blast.gif" alt="炸药当前动画"><figcaption>当前</figcaption></figure></div>
+<h2>电弧</h2><p>从飞行开始即呈现抖动折线、短分叉、紫色辉光和白色电芯；抛射时沿空中弹道显示。</p>
+<div class="pair"><figure><img src="before/effect-arc.gif" alt="电弧改动前动画"><figcaption>改动前</figcaption></figure><figure><img src="../2026-11-ui-refinement/effect-arc.gif" alt="电弧当前动画"><figcaption>当前</figcaption></figure></div>
+<h2>燃烧</h2><p>圆形范围内分散八簇小火苗，各自轻微跳动，并带有少量余烬。</p>
+<div class="pair"><figure><img src="before/effect-burn.gif" alt="燃烧改动前动画"><figcaption>改动前</figcaption></figure><figure><img src="../2026-11-ui-refinement/effect-burn.gif" alt="燃烧当前动画"><figcaption>当前</figcaption></figure></div>
+<h2>冷凝</h2><p>圆形范围内飘落十二片小雪花，轻微旋转并逐渐淡入淡出。</p>
+<div class="pair"><figure><img src="before/effect-frost.gif" alt="冷凝改动前动画"><figcaption>改动前</figcaption></figure><figure><img src="../2026-11-ui-refinement/effect-frost.gif" alt="冷凝当前动画"><figcaption>当前</figcaption></figure></div>
+<p>使用项目已有 Kenney Particle Pack 的 CC0 粒子，配合程序绘制；四张 128×128 透明 PNG 合计 29564 字节。近战附魔也使用对应命中特效。穿透、追踪等其他配件的行为与绘制保持原样；与上述四种配件组合时会呈现新的伤害特效。</p>
+<p><a href="../../../public/assets/fx/License.txt">素材许可</a> · <a href="../2026-11-ui-refinement/comparison.html">SVG / AI 图卡与体积对比、全部配件动画</a></p>
+<script>document.querySelector('#restart').onclick=()=>{const stamp=Date.now();document.querySelectorAll('img').forEach(image=>image.src=image.src.split('?')[0]+'?'+stamp);};</script>
+</html>

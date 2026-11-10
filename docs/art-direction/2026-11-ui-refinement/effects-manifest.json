@@ -1,0 +1,465 @@
+[
+  {
+    "key": "rifle",
+    "effects": [],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-rifle.gif",
+    "bytes": 90552,
+    "frames": [
+      {
+        "seconds": 0.1,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.2,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.36666666666666664,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      }
+    ]
+  },
+  {
+    "key": "blast",
+    "effects": [
+      "blast"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-blast.gif",
+    "bytes": 128023,
+    "frames": [
+      {
+        "seconds": 0.26666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.6,
+        "projectiles": 0,
+        "fields": 0,
+        "visuals": 3
+      },
+      {
+        "seconds": 0.8333333333333334,
+        "projectiles": 0,
+        "fields": 0,
+        "visuals": 1
+      }
+    ]
+  },
+  {
+    "key": "arc",
+    "effects": [
+      "arc"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-arc.gif",
+    "bytes": 62738,
+    "frames": [
+      {
+        "seconds": 0.26666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.5,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 2
+      },
+      {
+        "seconds": 0.6,
+        "projectiles": 0,
+        "fields": 0,
+        "visuals": 3
+      }
+    ]
+  },
+  {
+    "key": "burn",
+    "effects": [
+      "burn"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-burn.gif",
+    "bytes": 167069,
+    "frames": [
+      {
+        "seconds": 0.26666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.6,
+        "projectiles": 0,
+        "fields": 1,
+        "visuals": 2
+      },
+      {
+        "seconds": 1.2,
+        "projectiles": 0,
+        "fields": 1,
+        "visuals": 1
+      }
+    ]
+  },
+  {
+    "key": "frost",
+    "effects": [
+      "frost"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-frost.gif",
+    "bytes": 162558,
+    "frames": [
+      {
+        "seconds": 0.26666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.6,
+        "projectiles": 0,
+        "fields": 1,
+        "visuals": 2
+      },
+      {
+        "seconds": 1.2,
+        "projectiles": 0,
+        "fields": 1,
+        "visuals": 1
+      }
+    ]
+  },
+  {
+    "key": "pierce",
+    "effects": [
+      "pierce"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-pierce.gif",
+    "bytes": 60586,
+    "frames": [
+      {
+        "seconds": 0.36666666666666664,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 1
+      },
+      {
+        "seconds": 0.5666666666666667,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 2
+      },
+      {
+        "seconds": 0.7333333333333333,
+        "projectiles": 0,
+        "fields": 0,
+        "visuals": 2
+      }
+    ]
+  },
+  {
+    "key": "bounce",
+    "effects": [
+      "bounce"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-bounce.gif",
+    "bytes": 59555,
+    "frames": [
+      {
+        "seconds": 0.3,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.5,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 1
+      },
+      {
+        "seconds": 0.7,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 1
+      }
+    ]
+  },
+  {
+    "key": "split",
+    "effects": [
+      "split"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-split.gif",
+    "bytes": 52129,
+    "frames": [
+      {
+        "seconds": 0.2,
+        "projectiles": 3,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.43333333333333335,
+        "projectiles": 3,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.6666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 2
+      }
+    ]
+  },
+  {
+    "key": "return",
+    "effects": [
+      "return"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-return.gif",
+    "bytes": 47496,
+    "frames": [
+      {
+        "seconds": 0.3,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.7666666666666667,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 1.1666666666666667,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      }
+    ]
+  },
+  {
+    "key": "homing",
+    "effects": [
+      "homing"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-homing.gif",
+    "bytes": 60067,
+    "frames": [
+      {
+        "seconds": 0.2,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.4,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.5666666666666667,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      }
+    ]
+  },
+  {
+    "key": "linger",
+    "effects": [
+      "linger"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-linger.gif",
+    "bytes": 103642,
+    "frames": [
+      {
+        "seconds": 0.3,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.6666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 2
+      },
+      {
+        "seconds": 1.6666666666666667,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 1
+      }
+    ]
+  },
+  {
+    "key": "trail",
+    "effects": [
+      "trail",
+      "burn"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-trail.gif",
+    "bytes": 274009,
+    "frames": [
+      {
+        "seconds": 0.26666666666666666,
+        "projectiles": 1,
+        "fields": 2,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.5,
+        "projectiles": 1,
+        "fields": 3,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.7333333333333333,
+        "projectiles": 0,
+        "fields": 5,
+        "visuals": 2
+      }
+    ]
+  },
+  {
+    "key": "delay",
+    "effects": [
+      "delay",
+      "blast"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-delay.gif",
+    "bytes": 153679,
+    "frames": [
+      {
+        "seconds": 0.3,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.6666666666666666,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 1
+      },
+      {
+        "seconds": 1.7,
+        "projectiles": 0,
+        "fields": 0,
+        "visuals": 2
+      }
+    ]
+  },
+  {
+    "key": "lob",
+    "effects": [
+      "lob",
+      "blast"
+    ],
+    "duration": 4,
+    "fps": 30,
+    "animation": "effect-lob.gif",
+    "bytes": 128292,
+    "frames": [
+      {
+        "seconds": 0.4,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 0.8,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 1.4,
+        "projectiles": 0,
+        "fields": 0,
+        "visuals": 3
+      }
+    ]
+  },
+  {
+    "key": "all",
+    "effects": [
+      "blast",
+      "arc",
+      "burn",
+      "frost",
+      "pierce",
+      "bounce",
+      "split",
+      "return",
+      "homing",
+      "linger",
+      "trail",
+      "delay",
+      "lob"
+    ],
+    "duration": 9,
+    "fps": 30,
+    "animation": "effect-all.gif",
+    "bytes": 484986,
+    "frames": [
+      {
+        "seconds": 0.7,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      },
+      {
+        "seconds": 1.5,
+        "projectiles": 1,
+        "fields": 12,
+        "visuals": 10
+      },
+      {
+        "seconds": 4.1,
+        "projectiles": 1,
+        "fields": 0,
+        "visuals": 0
+      }
+    ]
+  }
+]

@@ -1,0 +1,257 @@
+{
+  "dimensions": "600 × 300",
+  "webpQuality": 82,
+  "totals": {
+    "全部": {
+      "svg": 407571,
+      "svgGzip": 291138,
+      "originalPng": 35237887,
+      "png600": 5006571,
+      "webp600": 321930
+    },
+    "装备": {
+      "svg": 33897,
+      "svgGzip": 11336,
+      "originalPng": 27832144,
+      "png600": 3970798,
+      "webp600": 239014
+    },
+    "建筑": {
+      "svg": 373674,
+      "svgGzip": 279802,
+      "originalPng": 7405743,
+      "png600": 1035773,
+      "webp600": 82916
+    }
+  },
+  "rows": [
+    {
+      "key": "rifle",
+      "name": "步枪",
+      "group": "装备",
+      "svg": 1659,
+      "svgGzip": 723,
+      "originalPng": 1594398,
+      "png600": 196825,
+      "webp600": 11314,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "sword",
+      "name": "剑",
+      "group": "装备",
+      "svg": 1708,
+      "svgGzip": 747,
+      "originalPng": 1884828,
+      "png600": 240392,
+      "webp600": 13804,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "blast",
+      "name": "炸药",
+      "group": "装备",
+      "svg": 2903,
+      "svgGzip": 947,
+      "originalPng": 2279663,
+      "png600": 348024,
+      "webp600": 29070,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "arc",
+      "name": "电弧",
+      "group": "装备",
+      "svg": 2403,
+      "svgGzip": 725,
+      "originalPng": 1939689,
+      "png600": 285575,
+      "webp600": 21156,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "burn",
+      "name": "燃烧剂",
+      "group": "装备",
+      "svg": 2194,
+      "svgGzip": 789,
+      "originalPng": 1928520,
+      "png600": 334483,
+      "webp600": 26132,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "frost",
+      "name": "冷凝剂",
+      "group": "装备",
+      "svg": 2510,
+      "svgGzip": 766,
+      "originalPng": 2245768,
+      "png600": 317178,
+      "webp600": 25864,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "pierce",
+      "name": "穿透",
+      "group": "装备",
+      "svg": 2337,
+      "svgGzip": 690,
+      "originalPng": 2067662,
+      "png600": 296635,
+      "webp600": 13048,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "bounce",
+      "name": "弹跳",
+      "group": "装备",
+      "svg": 2271,
+      "svgGzip": 676,
+      "originalPng": 1826890,
+      "png600": 259650,
+      "webp600": 12044,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "split",
+      "name": "分裂",
+      "group": "装备",
+      "svg": 2686,
+      "svgGzip": 687,
+      "originalPng": 1860035,
+      "png600": 237765,
+      "webp600": 14116,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "return",
+      "name": "返航",
+      "group": "装备",
+      "svg": 1812,
+      "svgGzip": 672,
+      "originalPng": 1754331,
+      "png600": 225239,
+      "webp600": 11678,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "homing",
+      "name": "追踪",
+      "group": "装备",
+      "svg": 2069,
+      "svgGzip": 712,
+      "originalPng": 1722977,
+      "png600": 237871,
+      "webp600": 7890,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "linger",
+      "name": "滞留",
+      "group": "装备",
+      "svg": 2095,
+      "svgGzip": 728,
+      "originalPng": 1711750,
+      "png600": 253473,
+      "webp600": 12010,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "trail",
+      "name": "留痕",
+      "group": "装备",
+      "svg": 2936,
+      "svgGzip": 807,
+      "originalPng": 1596101,
+      "png600": 201920,
+      "webp600": 10788,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "delay",
+      "name": "延时",
+      "group": "装备",
+      "svg": 2456,
+      "svgGzip": 947,
+      "originalPng": 1756710,
+      "png600": 302842,
+      "webp600": 15518,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "lob",
+      "name": "抛射",
+      "group": "装备",
+      "svg": 1858,
+      "svgGzip": 720,
+      "originalPng": 1662822,
+      "png600": 232926,
+      "webp600": 14582,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "barracks",
+      "name": "兵营",
+      "group": "建筑",
+      "svg": 70377,
+      "svgGzip": 52253,
+      "originalPng": 1962953,
+      "png600": 268897,
+      "webp600": 17452,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "launcherWorks",
+      "name": "发射器工坊",
+      "group": "建筑",
+      "svg": 107030,
+      "svgGzip": 80345,
+      "originalPng": 1991536,
+      "png600": 282981,
+      "webp600": 26548,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "attachmentWorks",
+      "name": "配件工坊",
+      "group": "建筑",
+      "svg": 107273,
+      "svgGzip": 80410,
+      "originalPng": 1882285,
+      "png600": 259518,
+      "webp600": 22398,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    },
+    {
+      "key": "mine",
+      "name": "金矿",
+      "group": "建筑",
+      "svg": 88994,
+      "svgGzip": 66794,
+      "originalPng": 1568969,
+      "png600": 224377,
+      "webp600": 16518,
+      "originalWidth": 1774,
+      "originalHeight": 887
+    }
+  ]
+}

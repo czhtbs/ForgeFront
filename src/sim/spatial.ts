@@ -1,3 +1,4 @@
+import { sin, cos, atan2 } from './math.ts';
 import { distance, inside } from './map.ts';
 import type { Point, Province, Soldier } from './types.ts';
 import { FORT } from './types.ts';
@@ -10,6 +11,7 @@ export function battleFrame(p: Province) {
 }
 export const SOLDIER_SIZE = 2.7;
 export const BATTLE_SPACING = SOLDIER_SIZE * 1.2;
+export const troopCenter = (troops: Soldier[]): Point => ({ x: troops.reduce((sum, s) => sum + s.position!.x, 0) / troops.length, y: troops.reduce((sum, s) => sum + s.position!.y, 0) / troops.length });
 export const buildingWidth = (p: Province) => p.building === 'hq' ? 36 : p.building ? 32 : 22;
 export const troopSize = (_p: Province) => SOLDIER_SIZE;
 export const fortPosition = (p: Province): Point => { const f = battleFrame(p); return { x: f.x + FORT.x * f.scale, y: f.y + FORT.y * f.scale }; };
@@ -38,6 +40,8 @@ export function formation(p: Province, count: number): Point[] {
     queues.set(p, points);
   }
   // Extra survivors use additional slots; existing slots never shift when the population changes.
+  // Extend a copy of the base queue so a restored world does not depend on earlier population sizes.
+  points = [...points];
   if (count > points.length) {
     const originals = [...points];
     for (let layer = 1; points.length < count; layer++) for (const point of originals) {
@@ -60,11 +64,11 @@ export function assignSlots(p: Province, troops: Soldier[]) {
 export function moveSoldier(s: Soldier, destination: Point, distanceLimit: number) {
   const position = s.position!, d = distance(position, destination);
   if (d < .001) return;
-  s.angle = Math.atan2(destination.y - position.y, destination.x - position.x);
+  s.angle = atan2(destination.y - position.y, destination.x - position.x);
   const scale = Math.min(1, distanceLimit / d);
   position.x += (destination.x - position.x) * scale; position.y += (destination.y - position.y) * scale;
 }
 export function marchOffset(slot: number, angle: number): Point {
   const side = (slot % 5 - 2) * SOLDIER_SIZE * 1.9, back = Math.floor(slot / 5) * SOLDIER_SIZE * 1.9;
-  return { x: -Math.sin(angle) * side - Math.cos(angle) * back, y: Math.cos(angle) * side - Math.sin(angle) * back };
+  return { x: -sin(angle) * side - cos(angle) * back, y: cos(angle) * side - sin(angle) * back };
 }

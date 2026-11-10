@@ -30,10 +30,10 @@ export function pointAlong(points: Point[], travel: number): Point {
   return points[points.length - 1];
 }
 export const ROUTE_COLORS = [0x179785, 0x398bc5, 0xb577c7, 0xd29528, 0xd87153, 0x688c29];
-export const routeNumber = (w: World, id: number) => w.routes.filter(r => r.owner === 0).findIndex(r => r.id === id) + 1;
+export const routeNumber = (w: World, id: number) => { const owner = w.routes.find(r => r.id === id)?.owner; return w.routes.filter(r => r.owner === owner).findIndex(r => r.id === id) + 1; };
 export const attackDestination = (w: World, province: number, owner: number) => w.provinces[province].owner !== owner || w.battles.some(b => b.province === province && [...b.fighters, ...b.reserve].some(s => s.owner !== owner));
-export function supplyLanes(w: World, selected: number, zoom: number) {
-  const routes = w.routes.map(r => ({ r, highlighted: r.owner === 0 && (r.from === selected || r.to === selected), points: routeGeometry(w, r) }));
+export function supplyLanes(w: World, selected: number, zoom: number, owner = 0) {
+  const routes = w.routes.map(r => ({ r, highlighted: r.owner === owner && (r.from === selected || r.to === selected), points: routeGeometry(w, r) }));
   const key = (a: Point, b: Point) => [`${a.x.toFixed(2)},${a.y.toFixed(2)}`, `${b.x.toFixed(2)},${b.y.toFixed(2)}`].sort().join(':');
   const shared = new Map<string, number[]>();
   for (const { r, points, highlighted } of routes) if (highlighted) for (let i = 1; i < points.length; i++) { const k = key(points[i - 1].point, points[i].point), ids = shared.get(k) ?? []; if (!ids.includes(r.id)) ids.push(r.id); shared.set(k, ids); }

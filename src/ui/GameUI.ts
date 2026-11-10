@@ -1,7 +1,9 @@
-import { WORKSHOP_ITEMS, EFFECTS, isWorkshop, itemName, equipmentName, unitKey, canFight } from '../content/equipment.ts';
-import type { Item, Effect } from '../content/equipment.ts';
-import { build, connect, dispatch, endMatch, localTroops, productionState, reroute, retreat, trainingBattle, upgrade, disconnect, routeRate, allTroops, orderUnits, setFactoryOutput, bombard, ceaseFire } from '../sim/world.ts';
-import { artilleryError } from '../sim/attacks.ts';
+import { WORKSHOP_ITEMS, isWorkshop, itemName, equipmentName, unitKey, canFight } from '../content/equipment.ts';
+import type { Item } from '../content/equipment.ts';
+import { endMatch, localTroops, productionState, trainingBattle, allTroops } from '../sim/world.ts';
+import { submitLocal } from '../sim/commands.ts';
+import type { Command } from '../sim/commands.ts';
+import type { Lobby } from '../net/protocol.ts';
 import { BUILDING_NAMES } from '../sim/types.ts';
 import type { Settings, World, Building, Point } from '../sim/types.ts';
 import { toggleUnits } from './interaction.ts';
@@ -12,8 +14,11 @@ const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt
 const clock = (n: number) => `${Math.floor(n / 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
 export class GameUI {
   world!: World;
+  player = 0;
+  online = false;
+  network?: { enter(): void; leave(): void; configure(settings: Settings, ai: number): void; start(): void };
+  send: (command: Command) => string | null = command => submitLocal(this.world, this.player, command);
   selected = -1;
-  mode: 'production' | 'building' = 'production';
   active = false;
   debug = false;
   simulationMs = 0;
@@ -25,7 +30,7 @@ export class GameUI {
   private panelMarkup = "";
   private lineMarkup = "";
   constructor(private scene: MapScene, private start: (settings: Settings) => void) {
-    document.querySelector('#app')!.innerHTML = `<header class="topbar"><b>铸造前线</b><div id="resources"></div><button data-action="overview">全图 H</button><button data-action="end">结束本局</button></header><main><section id="map" aria-label="战略地图"><div class="map-help">单击选择 · 拖部队下令 · 拖工坊连补给 · 滚轮缩放 · 右键平移</div><div id="line-tools" hidden></div><div id="toast" role="status"></div><div id="debug" hidden></div></section><aside id="sidebar" hidden aria-label="当前选择"></aside></main><section id="menu" class="veil"></section>`;
+    document.querySelector('#app')!.innerHTML = `<header class="topbar"><b>铸造前线</b><span id="network-status" role="status"></span><div id="resources"></div><button data-action="overview">全图</button><button data-action="end">结束本局</button></header><main><section id="map" aria-label="战略地图"><div id="line-tools" hidden></div><div id="toast" role="status"></div><div id="debug" hidden></div></section><aside id="sidebar" hidden aria-label="当前选择"></aside></main><section id="menu" class="veil"></section>`;
     document.querySelector('#app')!.addEventListener('pointerdown', e => {
       if ((e.target as HTMLElement).closest('button, input, select')) this.controlHeld = true;
     }, true);
@@ -33,45 +38,55 @@ export class GameUI {
     window.addEventListener('pointercancel', () => { this.controlHeld = false; });
     window.addEventListener('blur', () => { this.controlHeld = false; });
     document.querySelector('#app')!.addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]'); if (b && !b.disabled) this.action(b.dataset.action!, b.dataset.id); });
-    document.querySelector('#sidebar')!.addEventListener('change', e => {
-      const el = e.target as HTMLInputElement;
-      if (el.id === 'factory-output') { this.report(setFactoryOutput(this.world, this.selected, el.value as Item), '产出已切换'); this.render(true); }
-    });
     window.addEventListener('keydown', e => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
       if (!this.active) return;
       if (e.key.toLowerCase() === 'h') this.scene.fit();
       if (e.key === 'F3') { e.preventDefault(); this.debug = !this.debug; }
-      if (e.key === 'Escape') { this.scene.bombardMode = false; this.scene.cancelDrag(); this.select(-1); }
+      if (e.key === 'Escape') { this.scene.cancelDrag(); this.select(-1); }
       if (e.key === 'Delete') this.scene.deleteSelected();
     });
   }
-  bind(world: World) { this.world = world; this.selected = -1; this.scene.selected = -1; this.mode = 'production'; this.resultShown = false; this.active = true; this.scene.enabled = true; document.querySelector<HTMLElement>('#menu')!.hidden = true; this.render(true); }
+  bind(world: World, player = 0) { this.world = world; this.player = this.scene.player = player; this.selected = -1; this.scene.selected = -1; this.resultShown = false; this.active = true; this.scene.enabled = true; document.querySelector<HTMLElement>('#menu')!.hidden = true; this.render(true); }
   home() {
+    if (this.online) { this.network!.leave(); this.online = false; this.player = this.scene.player = 0; this.send = command => submitLocal(this.world, this.player, command); }
     this.active = false; this.scene.enabled = false; this.scene.cancelDrag(); this.select(-1);
     const menu = document.querySelector<HTMLElement>('#menu')!; menu.hidden = false;
-    menu.innerHTML = `<div class="menu-card"><p class="eyebrow">FORGEFRONT</p><h1>铸造前线</h1><p>建设工坊，武装肉人，夺取敌方总部。</p><button class="primary wide" data-action="setup">开始对局</button><button class="wide" data-action="training">装备试验场</button><p class="muted">肉人在兵营装配，首次离营后成为军队。<br>工坊连线决定装备，不保留装备库存。</p></div>`;
+    menu.innerHTML = `<div class="menu-card"><p class="eyebrow">FORGEFRONT</p><h1>铸造前线</h1><button class="primary wide" data-action="multiplayer">联机对局</button><button class="wide" data-action="setup">单人对局</button><button class="wide" data-action="training">装备试验场</button></div>`;
+  }
+  enterNetwork() {
+    this.online = true; this.active = false; this.scene.enabled = false;
+    document.querySelector('#menu')!.innerHTML = '<div class="menu-card"><h1>联机对局</h1><p data-network-status role="status">连接中</p><button class="wide" data-action="home">返回</button></div>';
+    this.network!.enter();
+  }
+  lobby(lobby: Lobby, player: number) {
+    this.player = this.scene.player = player; this.active = false; this.scene.enabled = false;
+    const host = lobby.host === player, menu = document.querySelector<HTMLElement>('#menu')!; menu.hidden = false;
+    menu.innerHTML = `<div class="menu-card"><h1>联机大厅</h1><p data-network-status role="status"></p><div class="lobby-players">${lobby.players.map(p => `<div class="stat-line"><span>玩家 ${p.player + 1}${p.player === player ? ' · 你' : ''}${p.player === lobby.host ? ' · 房主' : ''}</span><b>${p.connected ? '在线' : '离线'}</b></div>`).join('')}</div><label>地图<select id="room-count" ${host ? '' : 'disabled'}>${MAP_SIZES.map(size => `<option value="${size.count}" ${size.count === lobby.settings.count ? 'selected' : ''}>${size.name} · ${size.count} 地块</option>`).join('')}</select></label><label>AI<select id="room-ai" ${host ? '' : 'disabled'}>${Array.from({ length: 7 - lobby.players.length }, (_, n) => `<option value="${n}" ${n === lobby.ai ? 'selected' : ''}>${n} 名 AI</option>`).join('')}</select></label><label>难度<select id="room-difficulty" ${host ? '' : 'disabled'}>${[['easy', '休闲'], ['normal', '标准'], ['hard', '进取']].map(([value, name]) => `<option value="${value}" ${value === lobby.settings.difficulty ? 'selected' : ''}>${name}</option>`).join('')}</select></label><label>种子<input id="room-seed" type="number" value="${lobby.settings.seed}" ${host ? '' : 'disabled'}></label>${host ? '<button class="primary wide" data-action="room-start">开始对局</button>' : ''}<button class="wide" data-action="home">返回</button></div>`;
+    if (host) for (const id of ['room-count', 'room-ai', 'room-difficulty', 'room-seed']) document.getElementById(id)!.addEventListener('change', () => this.configureRoom());
+  }
+  private configureRoom() {
+    const value = (id: string) => (document.getElementById('room-' + id) as HTMLInputElement).value;
+    this.network!.configure({ count: Number(value('count')), seed: Number(value('seed')), enemies: 1, difficulty: value('difficulty') as Settings['difficulty'] }, Number(value('ai')));
   }
   private setup() {
-    document.querySelector('#menu')!.innerHTML = `<div class="menu-card"><h1>开始对局</h1><label>地图<select id="start-count">${MAP_SIZES.map(size => `<option value="${size.count}">${size.name} · ${size.count} 地块</option>`).join('')}</select></label><label>对手<select id="start-enemies"><option value="1">1 名 AI</option><option value="3">3 名 AI</option></select></label><label>难度<select id="start-difficulty"><option value="normal">标准</option><option value="easy">休闲</option><option value="hard">进取</option></select></label><label>种子<input id="start-seed" type="number" value="4521"></label><button class="primary wide" data-action="start">进入战区</button><button class="wide" data-action="home">返回</button></div>`;
+    document.querySelector('#menu')!.innerHTML = `<div class="menu-card"><h1>开始对局</h1><label>地图<select id="start-count">${MAP_SIZES.map(size => `<option value="${size.count}">${size.name} · ${size.count} 地块</option>`).join('')}</select></label><label>对手<select id="start-enemies">${[1, 2, 3, 4, 5].map(n => `<option value="${n}">${n} 名 AI</option>`).join('')}</select></label><label>难度<select id="start-difficulty"><option value="normal">标准</option><option value="easy">休闲</option><option value="hard">进取</option></select></label><label>种子<input id="start-seed" type="number" value="4521"></label><button class="primary wide" data-action="start">进入战区</button><button class="wide" data-action="home">返回</button></div>`;
   }
-  select(id: number) { this.scene.bombardMode = false; this.selected = id; this.scene.selected = id; this.scene.selectedUnits.clear(); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.mode = 'production'; this.render(true); }
+  select(id: number) { this.selected = id; this.scene.selected = id; this.scene.selectedUnits.clear(); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true); }
   selectUnits(ids: number[], additive: boolean, province = -1) {
-    this.scene.bombardMode = false; this.scene.selectedUnits = toggleUnits(this.scene.selectedUnits, ids, additive);
+    this.scene.selectedUnits = toggleUnits(this.scene.selectedUnits, ids, additive);
     this.selected = this.scene.selected = this.scene.selectedUnits.size ? province : -1;
     this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true);
   }
-  order(target: number, ids: number[]) {
+  order(target: number, ids: number[], point?: Point, targets?: number[]) {
     if (!this.active || this.world.winner !== null) return;
-    this.scene.bombardMode = false; this.report(orderUnits(this.world, ids, target)); this.render(true);
+    this.report(this.send({ type: 'armyOrder', units: ids, province: target, point, targets })); this.render(true);
   }
-  bombard(target: number, ids: number[], point: Point) {
-    if (!this.active || this.world.winner !== null) return;
-    this.report(bombard(this.world, ids, target, point)); this.render(true);
-  }
-  report(error: string | null, success = '指令已执行') { const toast = document.querySelector<HTMLElement>('#toast')!; toast.textContent = error ?? success; toast.className = error ? 'error show' : 'show'; this.toastTimer = performance.now() + 3000; }
+  report(error: string | null) { if (!error) return; const toast = document.querySelector<HTMLElement>('#toast')!; toast.textContent = '×'; toast.setAttribute('aria-label', error); toast.className = 'error show'; this.toastTimer = performance.now() + 1500; }
   private action(action: string, id?: string) {
     if (action === 'home') { this.home(); return; }
+    if (action === 'multiplayer') { this.enterNetwork(); return; }
+    if (action === 'room-start') { this.configureRoom(); this.network!.start(); return; }
     if (action === 'setup') { this.setup(); return; }
     if (action === 'start') {
       const value = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
@@ -81,28 +96,27 @@ export class GameUI {
     if (!this.active) return;
     if (action === 'select-route') { this.scene.selectedRoute = Number(id); this.scene.selectedWaypoint = -1; this.render(true); return; }
     if (action === 'overview') { this.scene.fit(); return; }
-    if (action === 'end') { endMatch(this.world); this.showResult(true); return; }
+    if (action === 'end') { if (this.online) this.report(this.send({ type: 'surrender' })); else { endMatch(this.world); this.showResult(true); } return; }
     if (action === 'close') { this.select(-1); return; }
     if (action === 'delete-point') { this.scene.deleteSelected(); return; }
-    if (action === 'delete-route') { disconnect(this.world, this.scene.selectedRoute); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true); return; }
-    if (action === 'reset-route') { this.report(reroute(this.world, this.scene.selectedRoute, [])); return; }
-    if (action === 'bombard') { this.scene.bombardMode = !this.scene.bombardMode; this.render(true); return; }
-    if (action === 'cease-fire') { ceaseFire(this.world, [...this.scene.selectedUnits]); this.scene.bombardMode = false; this.render(true); return; }
-    const p = this.world.provinces[this.selected]; if (!p || p.owner !== 0) return;
-    if (action === 'build') this.report(build(this.world, p.id, id as NonNullable<Building>));
-    if (action === 'upgrade') this.report(upgrade(this.world, p.id));
-    if (action === 'tab') this.mode = id as typeof this.mode;
+    if (action === 'delete-route') { this.report(this.send({ type: 'disconnect', route: this.scene.selectedRoute })); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true); return; }
+    if (action === 'reset-route') { this.report(this.send({ type: 'reroute', route: this.scene.selectedRoute, via: [] })); return; }
+    const p = this.world.provinces[this.selected]; if (!p || p.owner !== this.player) return;
+    if (action === 'build') this.report(this.send({ type: 'build', province: p.id, building: id as Exclude<Building, null | 'hq'> }));
+    if (action === 'upgrade') this.report(this.send({ type: 'upgrade', province: p.id }));
+    if (action === 'factory-output') this.report(this.send({ type: 'output', province: p.id, item: id as Item }));
     if (action === 'test') {
       const state = productionState(this.world, p.id);
-      if (state.error || !canFight(state)) this.report(state.error ?? '先接入兼容的发射器和弹药');
+      if (state.error || !canFight(state)) this.report(state.error ?? '先接入步枪或剑');
       else { const target = trainingBattle(this.world, state, Number((document.querySelector('#test-count') as HTMLSelectElement).value)); this.scene.focus(target, true); }
     }
     this.render(true);
   }
   private showResult(abandoned = false) {
-    endMatch(this.world); this.active = false; this.scene.enabled = false; this.scene.cancelDrag(); this.resultShown = true;
+    if (!this.online) endMatch(this.world); this.active = false; this.scene.enabled = false; this.scene.cancelDrag(); this.resultShown = true;
     const w = this.world, menu = document.querySelector<HTMLElement>('#menu')!; menu.hidden = false;
-    menu.innerHTML = `<div class="menu-card result"><h1>${abandoned ? '主动结束' : w.winner === 0 ? '战役胜利' : '总部失守'}</h1><p>作战时间 ${clock(w.time)}</p><table><thead><tr><th>阵营</th><th>击杀</th><th>阵亡</th><th>兵力</th><th>地块</th></tr></thead><tbody>${w.factions.map(f => `<tr><td>${f.id === 0 ? '玩家' : 'AI ' + f.id}</td><td>${w.stats[f.id].kills}</td><td>${w.stats[f.id].losses}</td><td>${w.result![f.id].troops}</td><td>${w.result![f.id].land}</td></tr>`).join('')}</tbody></table><p class="muted">兵力统计已装备人员；总部失守后的清理不计入击杀。</p><button class="primary wide" data-action="home">返回菜单</button></div>`;
+    const result = w.result ?? w.factions.map(f => ({ troops: allTroops(w).filter(s => s.owner === f.id && canFight(s)).length, land: w.provinces.filter(p => p.owner === f.id).length }));
+    menu.innerHTML = `<div class="menu-card result"><h1>${abandoned ? '主动结束' : w.winner === this.player ? '战役胜利' : '总部失守'}</h1><p>作战时间 ${clock(w.time)}</p><table><thead><tr><th>阵营</th><th>击杀</th><th>阵亡</th><th>兵力</th><th>地块</th></tr></thead><tbody>${w.factions.map(f => `<tr><td>${f.ai ? 'AI ' + (f.id + 1) : '玩家 ' + (f.id + 1)}</td><td>${w.stats[f.id].kills}</td><td>${w.stats[f.id].losses}</td><td>${result[f.id].troops}</td><td>${result[f.id].land}</td></tr>`).join('')}</tbody></table><button class="primary wide" data-action="home">返回菜单</button></div>`;
   }
   update(now: number) {
     if (now > this.toastTimer) document.querySelector('#toast')!.classList.remove('show');
@@ -110,7 +124,7 @@ export class GameUI {
     if (now - this.lastRender > 350) { this.lastRender = now; this.render(); }
     const debug = document.querySelector<HTMLElement>('#debug')!; debug.hidden = !this.debug || !this.active;
     if (this.debug) debug.textContent = `${this.scene.fps.toFixed(0)} FPS · 模拟 ${this.simulationMs.toFixed(1)} ms · 实体 ${this.scene.visibleUnits} · 积压 ${this.backlog.toFixed(2)} s`;
-    if (this.world.winner !== null && !this.resultShown) this.showResult();
+    if (this.active && (this.world.winner !== null || this.online && !this.world.factions[this.player]?.alive) && !this.resultShown) this.showResult();
     const tools = document.querySelector<HTMLElement>('#line-tools')!;
     tools.hidden = !this.active || this.scene.selectedRoute < 0;
     const markup = `<span class="route-caption">线路 ${routeNumber(this.world, this.scene.selectedRoute)}</span>` + (this.scene.selectedWaypoint >= 0 ? '<button data-action="delete-point">删除路径点</button>' : '<button data-action="reset-route">恢复最短路</button><button data-action="delete-route">删除连线</button>');
@@ -119,7 +133,7 @@ export class GameUI {
   render(force = false) {
     if (!this.world) return;
     const w = this.world, p = w.provinces[this.selected], panel = document.querySelector<HTMLElement>('#sidebar')!;
-    document.querySelector('#resources')!.innerHTML = `<span>黄金 <b>${Math.floor(w.factions[0].gold)}</b></span><span>军队 <b>${allTroops(w).filter(s => s.owner === 0 && canFight(s)).length}</b></span><span>${clock(w.time)}</span>`;
+    document.querySelector('#resources')!.innerHTML = `<span>黄金 <b>${Math.floor(w.factions[this.player]?.gold ?? 0)}</b></span><span>军队 <b>${allTroops(w).filter(s => s.owner === this.player && canFight(s)).length}</b></span><span>${clock(w.time)}</span>`;
     const selected = allTroops(w).filter(s => canFight(s) && this.scene.selectedUnits.has(s.id));
     this.scene.selectedUnits = new Set(selected.map(s => s.id));
     const show = (!!p || selected.length > 0) && this.active;
@@ -128,52 +142,35 @@ export class GameUI {
     }
     if (!show) return;
     if (!force && (this.controlHeld || panel.contains(document.activeElement) && ['INPUT', 'SELECT'].includes(document.activeElement!.tagName))) return;
-    const own = p?.owner === 0;
-    const title = selected.length ? '选中部队' : p.building ? BUILDING_NAMES[p.building] : '堡垒';
-    let html = `<div class="panel-head"><h2>${title}</h2><button data-action="close" aria-label="取消选择">×</button></div><div class="panel-body">${p && !selected.length && p.building ? `<img class="building-portrait" src="assets/b-style/${isWorkshop(p.building) ? 'workshop' : p.building}.png" alt="${title}">` : ''}`;
+    const own = p?.owner === this.player;
+    const title = selected.length ? '部队' : p.building ? BUILDING_NAMES[p.building] : '空地';
+    const upgradeButton = !selected.length && own && p.building ? `<button class="upgrade" data-action="upgrade" ${p.level >= 5 || !w.settings.training && w.factions[this.player].gold < p.level * 100 ? 'disabled' : ''}>${p.level >= 5 ? 'Lv.5' : `升级 <small>${p.level * 100} 金</small>`}</button>` : '';
+    let html = `<div class="panel-head"><h2>${title}${!selected.length && p.building ? `<small>Lv.${p.level}</small>` : ''}</h2>${upgradeButton}<button class="close" data-action="close" aria-label="取消选择">×</button></div><div class="panel-body">`;
     if (selected.length) {
       const groups = new Map<string, typeof selected>();
       for (const s of selected) { const key = `${s.owner}/${unitKey(s)}`, list = groups.get(key) ?? []; list.push(s); groups.set(key, list); }
       html += `<p class="big-number">${selected.length} 人</p>`;
-      for (const soldiers of groups.values()) { const first = soldiers[0]; html += `<h3>${esc(equipmentName(first))} · ${soldiers.length} 人</h3><p>${first.recruit ? '驻营士兵 · 可继续补装，也可出发' : '军队 · 装备已固定'}</p>`; }
-      const guns = selected.filter(s => s.owner === 0 && s.effects.includes('lob'));
-      if (guns.length) {
-        html += `<button class="wide ${this.scene.bombardMode ? 'chosen' : ''}" data-action="bombard">${this.scene.bombardMode ? '取消炮击选点' : '炮击：点击地图指定落点'}</button><button class="wide" data-action="cease-fire">停止炮击</button><p class="muted">射程 65–330。近距离受敌压制时停火；移动后取消炮击。</p>`;
-        for (const s of guns.filter(s => s.bombard).slice(0, 1)) {
-          const target = s.effects.includes('homing') && allTroops(w).find(t => t.id === s.bombard!.target && t.hp > 0 && t.owner !== s.owner);
-          html += `<p>${artilleryError(w, s, target ? target.position! : s.bombard!.point) ?? '持续炮击中'} · ${w.provinces[s.bombard!.province].name}</p>`;
-        }
-      }
+      for (const soldiers of groups.values()) html += `<div class="stat-line"><span>${esc(equipmentName(soldiers[0]))}</span><b>${soldiers.length}</b></div>`;
       const moving = w.shipments.reduce((n, s) => n + s.troops.filter(t => this.scene.selectedUnits.has(t.id)).length, 0);
-      if (moving) html += `<p>行军中 ${moving} 人 · 可拖动改道</p>`;
-      html += '<p class="muted">Ctrl 点击添加选择，再点同一组取消。拖动任一已选图标，为全部已选军队下令。</p>';
+      if (moving) html += `<div class="stat-line"><span>行军</span><b>${moving}</b></div>`;
     } else {
-      html += `<p class="owner">${p.owner < 0 ? '中立' : w.factions[p.owner].name}</p><div class="stat-line"><span>堡垒</span><b>${Math.ceil(p.hp)} / 1000</b></div><div class="meter"><i style="width:${p.hp / 10}%"></i></div>`;
-      if (p.hp <= 0) html += '<p class="notice">建筑瘫痪，停止产出；脱离攻击 8 秒后自动修复。占领需要地面部队。</p>';
-      if (own && p.building && p.building !== 'mine') html += `<div class="tabs"><button class="${this.mode === 'production' ? 'chosen' : ''}" data-action="tab" data-id="production">生产</button><button class="${this.mode === 'building' ? 'chosen' : ''}" data-action="tab" data-id="building">建筑</button></div>`;
-      if (own && !p.building) html += `<button class="wide" data-action="build" data-id="barracks">兵营 <span>140 金</span></button>${Object.keys(WORKSHOP_ITEMS).map(kind => `<button class="wide" data-action="build" data-id="${kind}">${BUILDING_NAMES[kind as keyof typeof WORKSHOP_ITEMS]} <span>110 金</span></button>`).join('')}<button class="wide" data-action="build" data-id="mine">金矿 <span>160 金</span></button>`;
-      else if (own && (this.mode === 'building' || p.building === 'mine')) html += `<p>建筑等级 ${p.level} / 5</p>${p.building === 'mine' ? `<p>收入 ${(3 + p.level).toFixed(0)} 金/秒</p>` : ''}${p.level < 5 ? `<button class="wide" data-action="upgrade">升级 <span>${p.level * 100} 金</span></button>` : ''}`;
-      else if (own && isWorkshop(p.building)) {
-        const routes = w.routes.filter(r => r.from === p.id && r.owner === 0);
-        if (p.output in EFFECTS) html += `<p>${EFFECTS[p.output as Effect].description}</p>`;
-        html += `<label>产出<select id="factory-output">${WORKSHOP_ITEMS[p.building].map(i => `<option value="${i}" ${p.output === i ? 'selected' : ''}>${itemName(i)}</option>`).join('')}</select></label><p>产能 ${(p.level / 4).toFixed(2)} 件/秒</p><p>${routes.length ? `${routes.length} 条连接 · 各 ${routeRate(w, p.id).toFixed(3)} 件/秒` : '无连接 · 产出浪费'}</p><p class="muted">从地图上的工坊建筑直接拖到兵营建筑。所有连接等分，满员与断线的份额浪费。</p>`;
-      } else if (own && (p.building === 'hq' || p.building === 'barracks')) {
-        const state = productionState(w, p.id), troops = localTroops(w, p.id, 0), naked = troops.filter(s => s.recruit && !canFight(s)).length, ready = troops.filter(s => s.recruit && canFight(s)).length;
-        html += `<div class="stat-line"><span>本地人数</span><b>${troops.length} / 60</b></div><p>未装备肉人 ${naked} · 可补装士兵 ${ready}<br>固定装备军队 ${troops.filter(s => !s.recruit).length}</p><p class="muted">${troops.length >= 60 ? '满员 · 停止生成肉人，继续补装' : `每 ${(3 / (1 + (p.level - 1) * .3)).toFixed(1)} 秒生成一名肉人`}</p><h3>完整配置目标</h3><p>${!state.weapon && !state.ammo ? '尚未接入发射器和弹药' : esc(equipmentName(state))}</p><p class="notice ${state.error ? 'error' : ''}">${esc(state.status)}${state.rate ? ` · ${state.rate.toFixed(3)} 件/秒` : ''}</p>${state.items.map(i => `<div class="stat-line"><span>${itemName(i)} · 待装 ${state.pending[i] ?? 0}</span><b>${(state.inputs[i] ?? 0).toFixed(3)} 件/秒</b></div>`).join('')}<p class="muted">发射器与弹药都装好才可战斗，后接配件自动补装。各项独立消耗，优先补齐已有装备的士兵。首次离营后固定配置，返回也不再补装。</p>`;
-        const groups = new Map<string, typeof troops>();
-        for (const s of troops.filter(canFight)) { const key = unitKey(s), list = groups.get(key) ?? []; list.push(s); groups.set(key, list); }
-        if (groups.size) html += '<h3>驻留兵种</h3>';
-        for (const soldiers of groups.values()) html += `<div class="stat-line"><span>${esc(equipmentName(soldiers[0]))}<small>${soldiers[0].recruit ? ' · 可补装' : ' · 已固定'}</small></span><b>${soldiers.length} 人</b></div>`;
-        if (w.settings.training) html += `<label>测试规模<select id="test-count"><option value="40">40 对 40</option><option value="120">120 对 120</option><option value="160">160 对 160</option></select></label><button class="wide" data-action="test">测试当前连线配置</button>`;
-      }
-      if (!own) html += '<p class="muted">将己方军队拖到这里，摧毁堡垒后占领。</p>';
-      const routes = own ? w.routes.filter(r => r.owner === 0 && (r.from === p.id || r.to === p.id)) : [];
-      if (routes.length) html += `<h3>补给线路</h3><p class="muted">点击一条线路，地图会单独高亮；再拖动该线可调整路径。</p>${routes.map(r => {
-        const n = routeNumber(w, r.id), target = w.provinces[r.from === p.id ? r.to : r.from], chosen = this.scene.selectedRoute === r.id;
-        return `<button class="route-choice ${chosen ? 'chosen' : ''}" data-action="select-route" data-id="${r.id}" aria-pressed="${chosen}"><i style="background:#${ROUTE_COLORS[(n - 1) % ROUTE_COLORS.length].toString(16).padStart(6, '0')}"></i><span><b>线路 ${n}</b> · ${esc(itemName(w.provinces[r.from].output))}<small>${r.from === p.id ? '送往' : '来自'} ${target.name} · ${target.building ? BUILDING_NAMES[target.building] : '堡垒'}</small></span></button>`;
-      }).join('')}`;
+      const troops = localTroops(w, p.id);
+      html += `<div class="stat-line"><span>血量</span><b>${Math.ceil(p.hp)} / 1000</b></div><div class="meter"><i style="width:${p.hp / 10}%"></i></div><div class="stat-line"><span>部队</span><b>${troops.length}</b></div>`;
+      if (p.building === 'hq' || p.building === 'barracks') html += `<div class="stat-line"><span>可装备</span><b>${troops.filter(s => s.owner === p.owner && s.recruit).length}</b></div>`;
+      if (isWorkshop(p.building)) html += `<div class="stat-line"><span>产出</span><b>${itemName(p.output)}</b></div>`;
+      const routes = own ? w.routes.filter(r => r.owner === this.player && (r.from === p.id || r.to === p.id)) : [];
+      if (routes.length) html += `<div class="route-list">${routes.map(r => {
+        const n = routeNumber(w, r.id), chosen = this.scene.selectedRoute === r.id;
+        return `<button class="route-choice ${chosen ? 'chosen' : ''}" data-action="select-route" data-id="${r.id}" aria-label="线路 ${n}" aria-pressed="${chosen}" style="--route-color:#${ROUTE_COLORS[(n - 1) % ROUTE_COLORS.length].toString(16).padStart(6, '0')}">${n}</button>`;
+      }).join('')}</div>`;
+      if (own && !p.building) html += `<div class="choice-list">${(['barracks', 'launcherWorks', 'attachmentWorks', 'mine'] as const).map(kind => {
+        const cost = kind === 'barracks' ? 140 : kind === 'mine' ? 160 : 110;
+        return `<button class="choice-card" data-action="build" data-id="${kind}" ${!w.settings.training && w.factions[this.player].gold < cost ? 'disabled' : ''}><span class="choice-title">${BUILDING_NAMES[kind]}<small>${cost} 金</small></span><img src="assets/cards/${kind}.svg" alt="" draggable="false"></button>`;
+      }).join('')}</div>`;
+      if (own && isWorkshop(p.building)) html += `<div class="choice-list">${WORKSHOP_ITEMS[p.building].map(item => `<button class="choice-card ${p.output === item ? 'chosen' : ''}" data-action="factory-output" data-id="${item}" aria-pressed="${p.output === item}"><span class="choice-title">${itemName(item)}</span><img src="assets/cards/${item}.svg" alt="" draggable="false"></button>`).join('')}</div>`;
+      if (own && w.settings.training && (p.building === 'hq' || p.building === 'barracks')) html += '<label>规模<select id="test-count"><option value="40">40 × 40</option><option value="120">120 × 120</option><option value="160">160 × 160</option></select></label><button class="wide" data-action="test">试战</button>';
     }
     html += '</div>';
-    if (html !== this.panelMarkup) { panel.innerHTML = html; this.panelMarkup = html; }
+    if (html !== this.panelMarkup) { const scroll = panel.scrollTop; panel.innerHTML = html; panel.scrollTop = scroll; this.panelMarkup = html; }
   }
 }

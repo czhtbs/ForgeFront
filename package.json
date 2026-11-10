@@ -1,11 +1,12 @@
 {
   "name": "forgefront",
   "version": "1.0.0",
-  "description": "ForgeFront single-player browser strategy game",
+  "description": "ForgeFront browser strategy game with authoritative multiplayer",
   "main": "index.js",
   "scripts": {
     "test": "node --experimental-strip-types --test --test-isolation=none",
     "dev": "vite",
+    "server": "node --experimental-strip-types server/index.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "probe": "node --experimental-strip-types src/debug/probe.ts"
@@ -15,7 +16,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "phaser": "^4.2.1"
+    "phaser": "^4.2.1",
+    "ws": "8.22.2"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

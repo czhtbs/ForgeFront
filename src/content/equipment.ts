@@ -2,7 +2,11 @@ export const WEAPONS = {
   launcher: { name: '通用发射器', range: 324, damage: 16, interval: .8, speed: 440 },
   hilt: { name: '剑柄', range: 48, damage: 28, interval: .75, speed: 0 },
 } as const;
-export const AMMO = { round: { name: '实体弹' }, beam: { name: '射束' }, blade: { name: '剑刃' } } as const;
+export const AMMO = { round: { name: '实体弹' }, blade: { name: '剑刃' } } as const;
+export const LAUNCHERS = {
+  rifle: { name: '步枪', weapon: 'launcher', ammo: 'round' },
+  sword: { name: '剑', weapon: 'hilt', ammo: 'blade' },
+} as const;
 export const EFFECTS = {
   blast: { name: '炸药', description: '远程在末端爆炸；近战只对命中者追加伤害' },
   arc: { name: '电弧', description: '远程弹体沿途放电；近战追加单兵伤害' },
@@ -21,40 +25,38 @@ export const EFFECTS = {
 export type Weapon = keyof typeof WEAPONS;
 export type Ammo = keyof typeof AMMO;
 export type Effect = keyof typeof EFFECTS;
-export type Item = Weapon | Ammo | Effect;
+export type Launcher = keyof typeof LAUNCHERS;
+export type Item = Launcher | Effect;
 export const PAYLOADS: Effect[] = ['blast', 'arc', 'burn', 'frost'];
 export const REMOTE_ONLY: Effect[] = ['bounce', 'split', 'return', 'homing', 'linger', 'trail', 'delay', 'lob'];
 export const WORKSHOP_ITEMS = {
-  launcherWorks: Object.keys(WEAPONS) as Item[],
-  ammoWorks: Object.keys(AMMO) as Item[],
+  launcherWorks: Object.keys(LAUNCHERS) as Item[],
   attachmentWorks: Object.keys(EFFECTS) as Item[],
 };
 export type Workshop = keyof typeof WORKSHOP_ITEMS;
 export const isWorkshop = (kind: string | null): kind is Workshop => kind !== null && kind in WORKSHOP_ITEMS;
-export const ITEMS = [...Object.keys(WEAPONS), ...Object.keys(AMMO), ...Object.keys(EFFECTS)] as Item[];
-export const itemName = (item: Item) => item in WEAPONS ? WEAPONS[item as Weapon].name : item in AMMO ? AMMO[item as Ammo].name : EFFECTS[item as Effect].name;
+export const ITEMS = [...Object.keys(LAUNCHERS), ...Object.keys(EFFECTS)] as Item[];
+export const itemName = (item: Item) => item in LAUNCHERS ? LAUNCHERS[item as Launcher].name : EFFECTS[item as Effect].name;
 export interface Loadout { weapon: Weapon | null; ammo: Ammo | null; effects: Effect[] }
 export function validateLoadout(s: Loadout): string | null {
   if (s.weapon === 'hilt' && s.ammo && s.ammo !== 'blade' || s.weapon && s.weapon !== 'hilt' && s.ammo === 'blade') return '剑柄需要剑刃，通用发射器需要远程弹药';
   if ((s.weapon === 'hilt' || s.ammo === 'blade') && s.effects.some(e => REMOTE_ONLY.includes(e))) return '近战行为配件仅支持穿透';
-  if (s.ammo === 'beam' && s.effects.includes('lob')) return '抛射仅支持实体弹';
   if (s.weapon && s.ammo && s.effects.includes('trail') && !s.effects.some(e => PAYLOADS.includes(e))) return '留痕需要效果配件';
   if (s.weapon && s.ammo && s.effects.includes('delay') && !s.effects.some(e => ['blast', 'burn', 'frost'].includes(e))) return '延时需要末端效果';
   return null;
 }
 export function configuration(items: Item[]) {
-  const unique = [...new Set(items)], weapons = unique.filter(i => i in WEAPONS) as Weapon[], ammo = unique.filter(i => i in AMMO) as Ammo[];
-  const loadout: Loadout = { weapon: weapons[0] ?? null, ammo: ammo[0] ?? null, effects: unique.filter(i => i in EFFECTS).sort() as Effect[] };
-  const error = weapons.length > 1 ? '发射器冲突' : ammo.length > 1 ? '弹药冲突' : validateLoadout(loadout);
+  const unique = [...new Set(items)], weapons = unique.filter(i => i in LAUNCHERS) as Launcher[], base = LAUNCHERS[weapons[0]];
+  const loadout: Loadout = { weapon: base?.weapon ?? null, ammo: base?.ammo ?? null, effects: unique.filter(i => i in EFFECTS).sort() as Effect[] };
+  const error = weapons.length > 1 ? '武器冲突' : validateLoadout(loadout);
   return { ...loadout, items: unique, error };
 }
 export const equipmentKey = (s: Loadout) => [s.weapon ?? '', s.ammo ?? '', ...[...s.effects].sort()].join(':');
-export const equipmentName = (s: Loadout) => [s.weapon && itemName(s.weapon), s.ammo && itemName(s.ammo), ...s.effects.map(itemName)].filter(Boolean).join(' · ');
+export const equipmentName = (s: Loadout) => [s.weapon && (s.weapon === 'hilt' ? '剑' : '步枪'), ...s.effects.map(itemName)].filter(Boolean).join(' · ');
 export const canFight = (s: Loadout) => !!s.weapon && !!s.ammo && !validateLoadout(s);
 export function canEquip(s: Loadout & { recruit?: boolean }, item: Item) {
   if (!s.recruit) return false;
-  if (item in WEAPONS) return !s.weapon && !validateLoadout({ ...s, weapon: item as Weapon });
-  if (item in AMMO) return !s.ammo && !validateLoadout({ ...s, ammo: item as Ammo });
+  if (item in LAUNCHERS) return !s.weapon && !validateLoadout({ ...s, ...LAUNCHERS[item as Launcher] });
   return !s.effects.includes(item as Effect) && !validateLoadout({ ...s, effects: [...s.effects, item as Effect] });
 }
 export const unitKey = (s: Loadout & { recruit?: boolean }) => `${s.recruit ? 'recruit' : 'army'}:${canFight(s) ? equipmentKey(s) : 'unarmed'}`;

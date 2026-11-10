@@ -1,6 +1,8 @@
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { drawUnit } from '../art-preview/soldiers.js';
+import { FACTION_COLORS } from '../src/sim/types.ts';
+import { UNIT_WEAPONS, ARMY_PORTRAITS } from '../src/render/art.ts';
 const { createCanvas, loadImage } = createRequire(import.meta.url)('@napi-rs/canvas');
 const sharp = createRequire(import.meta.url)('sharp');
 const output = new URL('../public/assets/b-style/', import.meta.url);
@@ -28,12 +30,12 @@ writeFileSync(new URL('../src/content/building-hits.ts', import.meta.url), '// G
 
 const assets = { soldier: await loadImage(readFileSync(new URL('../art-preview/assets/soldier-v2.svg', import.meta.url))) };
 const frames = JSON.parse(readFileSync(new URL('../art-preview/soldier-frames.json', import.meta.url)));
-const weapons = ['none', 'rifle', 'mg', 'sniper', 'rocket', 'flame'];
-const soldiers = createCanvas(24 * 160, 4 * 160), ctx = soldiers.getContext('2d');
-for (let owner = 0; owner < 4; owner++) for (const [i, weapon] of weapons.entries()) for (let recoil = 0; recoil < 4; recoil++) {
+const weapons = UNIT_WEAPONS;
+const soldiers = createCanvas(weapons.length * 4 * 160, FACTION_COLORS.length * 160), ctx = soldiers.getContext('2d');
+for (let owner = 0; owner < FACTION_COLORS.length; owner++) for (const [i, weapon] of weapons.entries()) for (let recoil = 0; recoil < 4; recoil++) {
   ctx.save(); ctx.translate((i * 4 + recoil) * 160, owner * 160);
   drawUnit(ctx, assets, frames, { weapon, x: 55, y: 80, size: 60, recoil: recoil / 3, enemy: owner === 1 });
-  ctx.fillStyle = ['#65b5ba', '#d9836c', '#d7b75b', '#b2a0d0'][owner]; ctx.fillRect(40, 98, 8, 3); ctx.restore();
+  ctx.fillStyle = ['#65b5ba', '#d9836c', '#d7b75b', '#b2a0d0', '#8fac69', '#d08faf'][owner]; ctx.fillRect(40, 98, 8, 3); ctx.restore();
 }
 save('soldiers.png', soldiers);
 const fragments = ['torso', 'helmet', 'rifle', 'mg', 'sniper', 'rocket', 'flame', 'tanks'];
@@ -52,6 +54,7 @@ const restArms = rect(6, 23, 5, 7, cloth) + rect(6, 29, 5, 4, '#bcab81') + rect(
 const holdingArms = rect(6, 21, 5, 7, cloth) + rect(8, 26, 7, 3, cloth) + rect(21, 21, 4, 7, cloth);
 const gear = {
   none: '',
+  sword: '<path d="M20 27L29 7 31 5 31 10 23 29Z" fill="#bacbd0" stroke="#263b41" stroke-width="1"/><path d="M23 24L30 8" stroke="#f1f7ef" stroke-width="1"/>' + rect(18, 25, 9, 3, '#c5a468') + rect(20, 28, 3, 6, '#65513d') + rect(19, 33, 5, 2, '#c5a468'),
   rifle: rect(10, 23, 17, 4, outline) + rect(23, 21, 5, 3, steel) + rect(27, 21, 3, 2, outline) + rect(12, 24, 5, 2, '#9a7351') + rect(18, 27, 3, 4, steel) + rect(22, 24, 4, 3, '#bcab81'),
   mg: rect(7, 23, 22, 5, outline) + rect(20, 22, 10, 2, steel) + rect(13, 27, 9, 6, '#b19852') + rect(15, 28, 5, 3, '#756238') + rect(23, 26, 4, 3, '#bcab81') + rect(8, 23, 7, 2, steel),
   sniper: rect(8, 23, 17, 3, outline) + rect(24, 21, 8, 2, steel) + rect(18, 19, 7, 3, outline) + rect(23, 19, 2, 2, '#8ab7b8') + rect(11, 24, 6, 2, '#85664b') + rect(20, 24, 3, 3, '#bcab81') + rect(9, 13, 6, 3, cloth),
@@ -61,8 +64,8 @@ const gear = {
 writeFileSync(new URL('parts/body.svg', output), svg(base));
 writeFileSync(new URL('parts/arms-idle.svg', output), svg(restArms));
 writeFileSync(new URL('parts/arms-holding.svg', output), svg(holdingArms));
-const portraits = createCanvas(32 * weapons.length, 40), pc = portraits.getContext('2d');
-for (const [i, weapon] of weapons.entries()) {
+const portraits = createCanvas(32 * ARMY_PORTRAITS.length, 40), pc = portraits.getContext('2d');
+for (const [i, weapon] of ARMY_PORTRAITS.entries()) {
   const gloves = weapon === 'none' ? '' : weapon === 'rocket' ? rect(13, 22, 4, 3, '#bcab81') + rect(22, 20, 4, 3, '#bcab81') : rect(12, 25, 4, 3, '#bcab81') + rect(22, 24, 4, 3, '#bcab81');
   writeFileSync(new URL(`parts/${weapon}.svg`, output), svg(gear[weapon] + gloves));
   pc.drawImage(await loadImage(Buffer.from(svg(base + (weapon === 'none' ? restArms : holdingArms) + gear[weapon] + gloves))), i * 32, 0);
@@ -75,4 +78,4 @@ for (const [i, name] of ['pierce', 'blast', 'gas', 'split'].entries()) {
   writeFileSync(new URL(`parts/${name}.svg`, output), data); mc.drawImage(await loadImage(Buffer.from(data)), i * 12, 0);
 }
 save('equipment-modules.png', modules);
-console.log('Built 8 scenery sprites, 96 infantry frames, 6 modular portraits and 4 equipment modules.');
+console.log(`Built 8 scenery sprites, ${weapons.length * 4 * FACTION_COLORS.length} infantry frames, ${ARMY_PORTRAITS.length} modular portraits and 4 equipment modules.`);

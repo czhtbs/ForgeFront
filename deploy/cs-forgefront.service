@@ -1,0 +1,36 @@
+[Unit]
+Description=ForgeFront authoritative multiplayer server
+After=network.target
+
+[Service]
+User=cs-forgefront
+Group=nginx
+WorkingDirectory=/usr/local/lib/cs-forgefront/current
+ExecStart=/usr/local/bin/node --experimental-strip-types server/index.mjs
+Environment=GAME_SOCKET=/run/cs-forgefront/game.sock
+Environment=GAME_BASE=/forgefront/play/
+Environment=GAME_ORIGIN=https://czhtbs.ykcryobs.cn
+Environment=GAME_DIAGNOSTICS=/var/lib/cs-forgefront/last-desync.json
+RuntimeDirectory=cs-forgefront
+RuntimeDirectoryMode=0750
+StateDirectory=cs-forgefront
+StateDirectoryMode=0750
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=64
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

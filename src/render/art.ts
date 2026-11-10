@@ -4,15 +4,24 @@ import type { Point, Province, Soldier, Casualty } from '../sim/types.ts';
 import { canFight } from '../content/equipment.ts';
 
 export const UNIT_WEAPONS = ['none', 'rifle', 'mg', 'sniper', 'rocket', 'flame'];
+export const ARMY_PORTRAITS = [...UNIT_WEAPONS, 'sword'];
 export { buildingWidth } from '../sim/spatial.ts';
-export const spriteWeapon = (s: Pick<Soldier, 'weapon'> & Partial<Pick<Soldier, 'effects' | 'ammo'>>) => !s.weapon || s.weapon === 'hilt' ? 'none' : s.effects?.includes('lob') ? 'rocket' : s.ammo === 'beam' ? 'flame' : 'rifle';
+export const spriteWeapon = (s: Pick<Soldier, 'weapon'> & Partial<Pick<Soldier, 'effects' | 'ammo'>>) => !s.weapon || s.weapon === 'hilt' ? 'none' : s.effects?.includes('lob') ? 'rocket' : 'rifle';
 export const unitFrame = (s: Soldier, recoil = 0) => UNIT_WEAPONS.indexOf(canFight(s) ? spriteWeapon(s) : 'none') * 4 + Math.round(recoil * 3);
+export const portraitFrame = (s: Soldier) => ARMY_PORTRAITS.indexOf(s.weapon === 'hilt' && canFight(s) ? 'sword' : canFight(s) ? spriteWeapon(s) : 'none');
+export function swordPose(s: Soldier, recoil: number) {
+  const facing = s.angle ?? 0, t = 1 - recoil;
+  const swing = recoil <= 0 ? .2 : t < .2 ? .2 - t * 6 : t < .7 ? -1 + (t - .2) * 4.4 : 1.2 - (t - .7) / .3;
+  const angle = facing + swing, grip = { x: s.position!.x + Math.cos(facing) * .45 - Math.sin(facing) * .9, y: s.position!.y + Math.sin(facing) * .45 + Math.cos(facing) * .9 };
+  const point = (along: number, side = 0) => ({ x: grip.x + Math.cos(angle) * along - Math.sin(angle) * side, y: grip.y + Math.sin(angle) * along + Math.cos(angle) * side });
+  return { grip, pommel: point(-.45), tip: point(3), guardA: point(.25, -.45), guardB: point(.25, .45) };
+}
 export const appear = (age: number, duration: number) => { const t = Math.max(0, Math.min(1, age / duration)); return t * t * (3 - 2 * t); };
 export const unitDetail = (zoom: number) => appear(SOLDIER_SIZE * zoom - 6, 4);
 export function deathFragments(c: Casualty, age: number) {
   const rand = randomSource(c.id * 417), t = Math.min(.8, age), fade = 1 - appear(age - 3.8, 1.2);
   const weapon = ['rifle', 'mg', 'sniper', 'rocket', 'flame'].indexOf(spriteWeapon(c));
-  const frames = [0, 1, ...(weapon >= 0 ? [2 + weapon] : []), ...(spriteWeapon(c) === 'flame' ? [7] : [])];
+  const frames = [0, 1, ...(weapon >= 0 ? [2 + weapon] : [])];
   return frames.map((frame, i) => {
     const angle = c.angle + (rand() - .5) * 3.6, reach = SOLDIER_SIZE * (i === 0 ? .37 : .56 + rand() * .74) * c.force;
     const drift = 1 - Math.exp(-t * 5), hop = Math.sin(t / .8 * Math.PI) * SOLDIER_SIZE * (i === 0 ? .15 : .41);

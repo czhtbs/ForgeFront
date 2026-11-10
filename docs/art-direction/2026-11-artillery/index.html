@@ -1,0 +1,7 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ForgeFront · 抛射操作与地图轮廓</title>
+<style>body{margin:32px auto;max-width:1440px;padding:0 20px;font:16px/1.7 system-ui,'Microsoft YaHei';background:#f7f8ef;color:#254b4e}img{display:block;width:100%;height:auto;border:1px solid #d2deca;border-radius:8px}h1{font-size:28px}h2{margin-top:36px}a{color:#247c7d}</style>
+<h1>抛射操作与地图轮廓</h1><p>抛射部队直接拖箭头指向敌方地块或军队。射程外自动接近，进入射程后停下展开；行军中也可中断并展开。最小射程 65、最大射程 330，以部队中心计算，近敌压制保留。右栏没有独立炮击按钮。</p>
+<p>每次发射重新瞄准敌军的当前真实位置，目标死亡后继续攻击所选组的幸存者。抛射伤害可作用于驻军、在途和交战单位；未装追踪的炮弹发射后仍按落点飞行，移动目标可以躲开。追踪配件负责发射后的空中修正。</p>
+<h2>种子生成多种外形</h2><p>相同地块数量保持相同平均面积；轮廓类型、长宽比例、横纵方向和地块分割均由种子确定。以下由实际地图生成及地形绘制逻辑离线导出。</p><img src="map-shapes.png" alt="六种种子的长方形、椭圆与不规则岛屿地图"><p><a href="seeds.json">示例种子</a></p>
+<h2>只保留步枪和剑</h2><p>建造与产出卡片继续使用 SVG，两列排布。激光枪的旧图卡和 AI 图片仅作本地历史素材保留。</p><img src="../2026-11-ui-refinement/ui-review.png" alt="删除激光枪后的游戏界面">
+<p><a href="../2026-11-ui-refinement/comparison.html">当前图卡与配件动画对照页</a></p></html>

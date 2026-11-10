@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
 import { createWorld, stepWorld, totalTroops, trainingBattle } from '../sim/world.ts';
 import { reinforce } from '../sim/combat.ts';
+import { stepLocalWorld } from '../sim/lockstep.ts';
 for (const effect of ['pierce', 'burn', 'split'] as const) {
   const scenario = createWorld({ seed: 4521, count: 10, enemies: 1, difficulty: 'normal', training: true });
   trainingBattle(scenario, { weapon: 'launcher', ammo: 'round', effects: [effect] }, 160);
@@ -16,7 +17,7 @@ const w = createWorld({ seed: 4521, count: 48, enemies: 3, difficulty: 'normal' 
 w.factions[0].ai = true;
 const start = performance.now(); let peakBattle = 0, maxBattles = 0;
 for (let i = 0; i < 30 * 60 * 30 && w.winner === null; i++) {
-  stepWorld(w); maxBattles = Math.max(maxBattles, w.battles.length);
+  stepLocalWorld(w); maxBattles = Math.max(maxBattles, w.battles.length);
   if (i % 300 === 0) {
     for (const p of w.provinces) { assert.ok(p.troops.length <= 60); assert.ok(p.hp >= 0 && p.hp <= 1000); }
     assert.ok(w.factions.every(f => f.gold >= 0));

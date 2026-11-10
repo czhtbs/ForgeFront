@@ -1,0 +1,106 @@
+{
+  "version": "e067d738586dfbd1",
+  "node": "v24.16.0",
+  "scenario": "80 provinces, 6 AI, 120 seconds, mixed melee/artillery and all damage effects; same initial snapshot and command log",
+  "commands": 345,
+  "samples": [
+    {
+      "tick": 1,
+      "units": 240,
+      "battles": 0,
+      "projectiles": 0,
+      "fields": 0
+    },
+    {
+      "tick": 301,
+      "units": 264,
+      "battles": 0,
+      "projectiles": 45,
+      "fields": 15
+    },
+    {
+      "tick": 601,
+      "units": 288,
+      "battles": 3,
+      "projectiles": 73,
+      "fields": 24
+    },
+    {
+      "tick": 901,
+      "units": 312,
+      "battles": 0,
+      "projectiles": 42,
+      "fields": 12
+    },
+    {
+      "tick": 1201,
+      "units": 342,
+      "battles": 0,
+      "projectiles": 41,
+      "fields": 12
+    },
+    {
+      "tick": 1501,
+      "units": 366,
+      "battles": 0,
+      "projectiles": 41,
+      "fields": 12
+    },
+    {
+      "tick": 1801,
+      "units": 390,
+      "battles": 0,
+      "projectiles": 40,
+      "fields": 12
+    },
+    {
+      "tick": 2101,
+      "units": 420,
+      "battles": 0,
+      "projectiles": 40,
+      "fields": 12
+    },
+    {
+      "tick": 2401,
+      "units": 450,
+      "battles": 0,
+      "projectiles": 33,
+      "fields": 10
+    },
+    {
+      "tick": 2701,
+      "units": 480,
+      "battles": 0,
+      "projectiles": 39,
+      "fields": 12
+    },
+    {
+      "tick": 3001,
+      "units": 510,
+      "battles": 0,
+      "projectiles": 41,
+      "fields": 5
+    },
+    {
+      "tick": 3301,
+      "units": 532,
+      "battles": 1,
+      "projectiles": 71,
+      "fields": 10
+    }
+  ],
+  "results": [
+    {
+      "engine": "Edge",
+      "version": "157.0.4341.42",
+      "tick": 3600,
+      "hash": "83ff2b8486069c96"
+    },
+    {
+      "engine": "Firefox",
+      "version": "153.0",
+      "tick": 3600,
+      "hash": "83ff2b8486069c96"
+    }
+  ]
+}
