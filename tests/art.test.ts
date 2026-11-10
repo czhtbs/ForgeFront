@@ -100,13 +100,18 @@ test('training deployments also fit the smaller fixed tile at every supported ba
   }
 });
 
-test('one to five AI start inland with distinct headquarters, colors and a neighboring mine', () => {
+test('one to five AI start on the coast with distinct headquarters, colors and a neighboring mine', () => {
   for (const count of [40, 60, 80]) for (const enemies of [1, 2, 3, 4, 5]) for (const seed of [1, 5, 9, 4521]) {
     const w = createWorld({ seed, count, enemies, difficulty: 'normal' }), coast = coastalCells(w.provinces), headquarters = w.factions.map(f => w.provinces[f.hq]);
     assert.equal(w.factions.length, enemies + 1); assert.equal(new Set(headquarters.map(p => p.id)).size, enemies + 1);
     assert.equal(new Set(w.factions.map(f => f.color)).size, enemies + 1);
-    for (const p of headquarters) { assert.ok(!coast.has(p.id), `${count}/${seed}/${enemies}: coastal HQ`); assert.ok(p.neighbors.some(id => w.provinces[id].owner === p.owner && w.provinces[id].building === 'mine')); assert.equal(p.troops.length, 40); }
+    for (const p of headquarters) { assert.ok(coast.has(p.id), `${count}/${seed}/${enemies}: inland HQ`); assert.ok(p.neighbors.some(id => w.provinces[id].owner === p.owner && w.provinces[id].building === 'mine')); assert.equal(p.troops.length, 40); }
     for (const p of headquarters) for (const q of headquarters) if (p.id !== q.id) assert.ok(distance(p, q) > 50);
+    if (enemies === 1) {
+      const bounds = mapBounds(w.provinces);
+      assert.ok(distance(headquarters[0], headquarters[1]) > Math.min(bounds.width, bounds.height) * .7);
+      assert.ok((headquarters[0].x - bounds.x) * (headquarters[1].x - bounds.x) < 0);
+    }
   }
 });
 

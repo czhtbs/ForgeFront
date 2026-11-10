@@ -25,6 +25,7 @@ export class MapScene extends Phaser.Scene {
   selectedUnits = new Set<number>();
   selectedRoute = -1;
   selectedWaypoint = -1;
+  tutorialTarget = -1;
   enabled = false;
   actions!: MapActions;
   fps = 0;
@@ -116,7 +117,7 @@ export class MapScene extends Phaser.Scene {
     return routeGeometry(this.world, route, via);
   }
   private pointerDown(pointer: Phaser.Input.Pointer) {
-    if (!this.enabled || !this.world || (pointer.event.target as HTMLElement)?.closest('#sidebar, #line-tools, #menu')) return;
+    if (!this.enabled || !this.world || (pointer.event.target as HTMLElement)?.closest('#sidebar, #line-tools, #menu, #tutorial')) return;
     const c = this.cameras.main, point = c.getWorldPoint(pointer.x, pointer.y);
     const base = { from: -1, time: performance.now(), x: pointer.x, y: pointer.y, sx: c.scrollX, sy: c.scrollY };
     if (pointer.rightButtonDown()) { this.drag = { ...base, kind: 'pan' }; return; }
@@ -146,7 +147,7 @@ export class MapScene extends Phaser.Scene {
     const d = this.drag; this.drag = undefined; if (!d || !this.enabled) return;
     const moved = d.moved || Math.hypot(pointer.x - d.x, pointer.y - d.y) >= 6;
     if (d.kind === 'pan') { if (!moved) this.actions.select(-1); return; }
-    if ((pointer.event.target as HTMLElement)?.closest('#sidebar, #line-tools, #menu')) return;
+    if ((pointer.event.target as HTMLElement)?.closest('#sidebar, #line-tools, #menu, #tutorial')) return;
     if (d.kind === 'select') {
       if (moved) {
         const camera = this.cameras.main, ids = boxUnits([...this.groupHits, ...this.unitHits], camera.getWorldPoint(d.x, d.y), camera.getWorldPoint(pointer.x, pointer.y), this.player);
@@ -351,6 +352,11 @@ export class MapScene extends Phaser.Scene {
     }
     if (changing || Math.floor(this.world.tick / 10) !== this.stamp) { this.stamp = Math.floor(this.world.tick / 10); this.drawLand(); }
     const g = this.overlay, c = this.cameras.main, z = c.zoom; g.clear(); this.effects.clear(); this.icons.clear(); this.commands.clear(); this.stains.clear(); this.labelIndex = 0; this.iconIndex = 0; this.groupHits = []; this.unitHits = []; this.lineHits = [];
+    if (this.tutorialTarget >= 0) {
+      const polygon = this.polygons[this.tutorialTarget];
+      g.fillStyle(0xffd65b, .12); g.fillPoints(polygon, true);
+      g.lineStyle(4 / z, 0xe5a321, .75 + .25 * Math.sin(this.clock * 4)); g.strokePoints(polygon, true);
+    }
     const detail = unitDetail(z); this.effects.setAlpha(detail); this.stains.setAlpha(detail);
     if (!this.world.routes.some(r => r.id === this.selectedRoute)) { this.selectedRoute = -1; this.selectedWaypoint = -1; }
     for (const id of this.routeBirth.keys()) if (!this.world.routes.some(r => r.id === id)) this.routeBirth.delete(id);

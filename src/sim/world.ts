@@ -14,16 +14,21 @@ export function createWorld(settings: Settings): World {
   const bounds = mapBounds(w.provinces), coast = coastalCells(w.provinces);
   for (let id = 0; id <= settings.enemies; id++) {
     const angle = Math.PI * .85 + id * Math.PI * 2 / (settings.enemies + 1);
-    const target = { x: bounds.x + cos(angle) * bounds.width * .24, y: bounds.y + sin(angle) * bounds.height * .24 };
-    const hq = w.provinces.filter(p => !occupied.has(p.id) && p.neighbors.some(n => !occupied.has(n))).sort((a, b) => Number(coast.has(a.id)) - Number(coast.has(b.id)) || distance(a, target) - distance(b, target))[0];
-    const mine = w.provinces[hq.neighbors.find(n => !occupied.has(n))!];
+    const target = { x: bounds.x + cos(angle) * bounds.width * .5, y: bounds.y + sin(angle) * bounds.height * .5 };
+    const hq = w.provinces.filter(p => !occupied.has(p.id) && p.neighbors.some(n => !occupied.has(n))).sort((a, b) => Number(coast.has(b.id)) - Number(coast.has(a.id)) || distance(a, target) - distance(b, target))[0];
+    const mine = hq.neighbors.map(n => w.provinces[n]).filter(p => !occupied.has(p.id)).sort((a, b) => Number(coast.has(a.id)) - Number(coast.has(b.id)) || distance(a, bounds) - distance(b, bounds))[0];
     occupied.add(hq.id); occupied.add(mine.id);
-    w.factions.push({ id, name: id === 0 ? '玩家' : `AI ${id}`, color: FACTION_COLORS[id], gold: 350, hq: hq.id, alive: true, ai: id !== 0 && !settings.training });
+    w.factions.push({ id, name: id === 0 ? '玩家' : `AI ${id}`, color: FACTION_COLORS[id], gold: 350, hq: hq.id, alive: true, ai: id !== 0 && !settings.training && !settings.tutorial });
     w.stats.push({ kills: 0, losses: 0 });
     hq.owner = id; hq.building = 'hq'; mine.owner = id; mine.building = 'mine';
     hq.troops = Array.from({ length: 40 }, () => soldier(w, id)); assignSlots(hq, hq.troops);
   }
   if (settings.training) for (const p of w.provinces) if (p.owner < 0) p.owner = 0;
+  if (settings.tutorial) {
+    const home = w.provinces[w.factions[0].hq];
+    w.provinces[home.neighbors.find(id => w.provinces[id].owner < 0)!].owner = 0;
+    home.troops = home.troops.slice(0, 12).map(s => ({ ...s, weapon: null, ammo: null, recruit: true }));
+  }
   return w;
 }
 export function localTroops(w: World, id: number, owner?: number): Soldier[] {

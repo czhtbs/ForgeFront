@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 import { createRequire, stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import { addBattle, reinforce } from '../src/sim/combat.ts';
-import { createWorld, dispatch, soldier, connect, build, orderUnits } from '../src/sim/world.ts';
-import { isWorkshop, WORKSHOP_ITEMS } from '../src/content/equipment.ts';
+import { createWorld, dispatch, soldier, connect, build, orderUnits, stepWorld, trainingBattle } from '../src/sim/world.ts';
+import { canFight, isWorkshop, WORKSHOP_ITEMS } from '../src/content/equipment.ts';
 
 // Run the real UI handlers against a minimal DOM; no browser automation is needed.
-function uiFixture() {
+function uiFixture(startGame = false) {
   const elements = new Map();
   class Element {
     hidden = false; writes = 0; markup = ''; listeners = new Map(); dataset = {}; disabled = false; scrollTop = 0; attributes = new Map();
@@ -21,7 +21,7 @@ function uiFixture() {
     set innerHTML(value) { this.markup = value; this.writes++; }
     get innerHTML() { return this.markup; }
   }
-  for (const selector of ['#app','#sidebar','#menu','#resources','#toast','#debug','#line-tools','main']) elements.set(selector,new Element());
+  for (const selector of ['#app','#sidebar','#menu','#resources','#toast','#debug','#line-tools','#tutorial','main']) elements.set(selector,new Element());
   elements.get('#sidebar').hidden = true;
   const document = { activeElement: null, querySelector: selector => elements.get(selector), getElementById: id => elements.get('#' + id) };
   const listeners = new Map(), timers = [];
@@ -30,13 +30,75 @@ function uiFixture() {
     .replace(/^import \{([^}]+)\} from '([^']+)';/gm, 'const {$1} = require("$2");')
     .replace('export class GameUI', 'exports.GameUI = class GameUI');
   runInNewContext(code,{ exports, require:createRequire(file), document, window:{addEventListener:(type,fn)=>listeners.set(type,fn)}, performance, setTimeout:fn=>timers.push(fn) });
-  const scene = { selectedUnits:new Set(), selectedRoute:-1, selectedWaypoint:-1, fps:60, scale:new Proxy({}, {set(){throw new Error('Sidebar must not resize the map');}}), cancelDrag(){}, fit(){} };
+  const scene = { selectedUnits:new Set(), selectedRoute:-1, selectedWaypoint:-1, fps:60, scale:new Proxy({}, {set(){throw new Error('Sidebar must not resize the map');}}), cancelDrag(){}, fit(){}, focus(){} };
   const starts = [];
-  const ui = new exports.GameUI(scene,settings=>starts.push(settings)), world=createWorld({seed:4521,count:12,enemies:1,difficulty:'normal'});
+  const ui = new exports.GameUI(scene,settings=>{ starts.push(settings); if (startGame) ui.bind(createWorld(settings)); }), world=createWorld({seed:4521,count:12,enemies:1,difficulty:'normal'});
   const p=world.provinces.find(p=>!p.building);p.owner=0;
   ui.bind(world);ui.select(p.id);
   return { ui, world, p, scene, elements, Element, listeners, timers, starts };
 }
+
+test('home separates tutorial, multiplayer, single-player and the 40-tile unlimited-gold trial', () => {
+  const { ui, elements } = uiFixture(true); ui.home();
+  for (const action of ['tutorial', 'multiplayer', 'setup', 'training']) assert.match(elements.get('#menu').innerHTML, new RegExp(`data-action="${action}"`));
+  ui.action('training'); const w = ui.world;
+  assert.equal(w.provinces.length, 40); assert.equal(w.settings.training, true); assert.equal(w.settings.tutorial, undefined);
+  assert.ok(w.factions.every(f => !f.ai)); assert.equal(elements.get('#tutorial').hidden, true);
+  assert.equal(ui.simulationSpeed, 1);
+  w.factions[0].gold = 0;
+  const plot = w.provinces.find(p => p.owner === 0 && !p.building); ui.select(plot.id);
+  ui.action('build', 'launcherWorks'); ui.action('upgrade'); ui.render();
+  assert.equal(plot.building, 'launcherWorks'); assert.equal(plot.level, 2); assert.equal(w.factions[0].gold, 0);
+  assert.match(elements.get('#resources').innerHTML, /黄金 <b>∞<\/b>/);
+  trainingBattle(w, { weapon: 'launcher', ammo: 'round', effects: ['lob', 'blast'] }, 4);
+  stepWorld(w); assert.equal(w.projectiles.length, 4);
+});
+
+test('tutorial teaches mining and paid upgrades before production, capture and accessory assembly', () => {
+  const { ui, scene, elements } = uiFixture(true); ui.action('tutorial');
+  const w = ui.world, guide = ui.tutorial, panel = elements.get('#tutorial');
+  const home = w.provinces[w.factions[0].hq], mine = w.provinces[guide.steps[1].province], plot = w.provinces[guide.steps[3].province], target = w.provinces[guide.steps[6].province];
+  assert.ok(w.factions.every(f => !f.ai)); assert.equal(w.settings.training, undefined);
+  assert.equal(home.troops.filter(canFight).length, 0); assert.equal(guide.step, 0);
+  assert.equal(ui.simulationSpeed, 1);
+  assert.ok(guide.steps.every(s => s.text.length <= 30)); assert.doesNotMatch(panel.innerHTML, /<small/);
+  ui.action('tutorial-next'); assert.equal(guide.step, 1); assert.equal(scene.tutorialTarget, mine.id);
+  for (let i = 0; i < 90; i++) stepWorld(w);
+  ui.render(); assert.equal(guide.step, 1);
+  const initialGold = w.factions[0].gold; ui.select(mine.id);
+  for (let i = 0; i < 30; i++) stepWorld(w);
+  ui.render(); assert.equal(guide.step, 1); assert.equal(ui.simulationSpeed, 1);
+  assert.ok(Math.abs(w.factions[0].gold - initialGold - 4) < 1e-8);
+  for (let i = 0; i < 60 && guide.step === 1; i++) { stepWorld(w); ui.render(); }
+  assert.equal(guide.step, 2); assert.ok(w.factions[0].gold >= initialGold + 8);
+  const beforeUpgrade = w.factions[0].gold; ui.action('upgrade');
+  assert.equal(mine.level, 2); assert.equal(w.factions[0].gold, beforeUpgrade - 100); assert.equal(guide.step, 3);
+  const upgradedGold = w.factions[0].gold;
+  for (let i = 0; i < 30; i++) stepWorld(w);
+  assert.ok(Math.abs(w.factions[0].gold - upgradedGold - 5) < 1e-8);
+  ui.select(plot.id); ui.action('build', 'launcherWorks'); assert.equal(guide.step, 4);
+  assert.equal(ui.send({ type: 'connect', from: plot.id, to: home.id }), null); ui.render(); assert.equal(guide.step, 5);
+  const advanceTo = step => {
+    assert.equal(ui.simulationSpeed, 8);
+    for (let tick = 0; tick < 30 * 6 && guide.step < step; tick++) {
+      for (let n = 0; n < ui.simulationSpeed; n++) stepWorld(w);
+      if (tick % 10 === 0) ui.render();
+    }
+    assert.equal(guide.step, step);
+    assert.equal(ui.simulationSpeed, 1);
+  };
+  advanceTo(6);
+  ui.order(target.id, home.troops.filter(canFight).map(s => s.id)); assert.equal(guide.step, 7);
+  advanceTo(8); assert.equal(target.owner, 0);
+  ui.select(target.id); ui.action('build', 'attachmentWorks'); assert.equal(guide.step, 9);
+  ui.action('factory-output', 'burn'); assert.equal(guide.step, 10);
+  assert.equal(ui.send({ type: 'connect', from: target.id, to: home.id }), null); ui.render(); assert.equal(guide.step, 11);
+  advanceTo(12); assert.match(panel.innerHTML, /完成教程/); assert.equal(scene.tutorialTarget, -1);
+  ui.home(); assert.equal(panel.hidden, true); assert.equal(ui.active, false); assert.equal(ui.simulationSpeed, 1);
+  ui.action('tutorial'); assert.equal(ui.tutorial.step, 0); assert.equal(ui.world.time, 0);
+  ui.action('end'); assert.equal(panel.hidden, true); assert.equal(scene.tutorialTarget, -1);
+  ui.action('training'); assert.equal(ui.tutorial, undefined); assert.equal(panel.hidden, true);
+});
 
 test('map menu offers small/medium/large and passes the chosen tile count to a new game', () => {
   const { elements, Element, starts } = uiFixture(), app = elements.get('#app');

@@ -19,7 +19,7 @@ export interface Field extends Point { owner: number; province: number | null; k
 export interface VisualEffect extends Point { kind: 'hit' | 'fort-hit' | 'blast' | 'death' | 'flame' | 'arc' | 'frost'; life: number; max: number; angle: number; target?: Point; radius?: number; }
 export interface Casualty extends Point { id: number; owner: number; weapon: Weapon | null; angle: number; force: number; time: number }
 export interface Battle { province: number; fighters: Fighter[]; reserve: Soldier[]; nextDeploy: number[]; models: boolean; shots: number; losses: number[] }
-export interface Settings { seed: number; count: number; enemies: number; difficulty: 'easy' | 'normal' | 'hard'; training?: boolean; multiplayer?: boolean }
+export interface Settings { seed: number; count: number; enemies: number; difficulty: 'easy' | 'normal' | 'hard'; training?: boolean; tutorial?: boolean; multiplayer?: boolean }
 export interface World {
   settings: Settings; time: number; tick: number; nextId: number; rng: number;
   provinces: Province[]; factions: Faction[]; routes: Route[]; shipments: Shipment[]; battles: Battle[]; flows: SupplyFlow[];

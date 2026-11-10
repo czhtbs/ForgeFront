@@ -37,7 +37,7 @@ function frame(now: number) {
   if (client) {
     const begin = performance.now(); client.update(elapsed); ui.simulationMs = performance.now() - begin; ui.backlog = client.replica.frames.length * STEP;
   } else if (ui.active && ui.world.winner === null) {
-    accumulator += elapsed;
+    accumulator += elapsed * ui.simulationSpeed;
     const begin = performance.now(); let steps = 0;
     // Retain elapsed time when a background tab is throttled; never silently skip simulation ticks.
     while (accumulator >= STEP && steps < 180) { stepLocalWorld(ui.world); accumulator -= STEP; steps++; }

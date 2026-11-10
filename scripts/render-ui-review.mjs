@@ -7,7 +7,7 @@ import { createWorld, soldier } from '../src/sim/world.ts';
 
 const file = new URL('../src/ui/GameUI.ts', import.meta.url), exports = {};
 const elements = new Map();
-for (const id of ['#app', '#sidebar', '#resources', '#menu', 'main']) elements.set(id, { innerHTML: '', hidden: false, scrollTop: 0, addEventListener() {}, contains() { return false; }, classList: { toggle() {} } });
+for (const id of ['#app', '#sidebar', '#resources', '#menu', '#tutorial', 'main']) elements.set(id, { innerHTML: '', hidden: false, scrollTop: 0, addEventListener() {}, contains() { return false; }, classList: { toggle() {} } });
 const document = { activeElement: null, querySelector: id => elements.get(id) };
 const code = stripTypeScriptTypes(readFileSync(file, 'utf8'), { mode: 'transform' })
   .replace(/^import \{([^}]+)\} from '([^']+)';/gm, 'const {$1} = require("$2");')

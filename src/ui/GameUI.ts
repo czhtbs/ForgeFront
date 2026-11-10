@@ -7,6 +7,7 @@ import type { Lobby } from '../net/protocol.ts';
 import { BUILDING_NAMES } from '../sim/types.ts';
 import type { Settings, World, Building, Point } from '../sim/types.ts';
 import { toggleUnits } from './interaction.ts';
+import { Tutorial } from './tutorial.ts';
 import { MAP_SIZES } from '../sim/map.ts';
 import { ROUTE_COLORS, routeNumber } from '../render/geometry.ts';
 import type { MapScene } from '../render/MapScene.ts';
@@ -23,14 +24,17 @@ export class GameUI {
   debug = false;
   simulationMs = 0;
   backlog = 0;
+  get simulationSpeed() { return this.active ? this.tutorial?.speed ?? 1 : 1; }
   private toastTimer = 0;
   private lastRender = 0;
   private resultShown = false;
   private controlHeld = false;
   private panelMarkup = "";
   private lineMarkup = "";
+  private tutorial?: Tutorial;
+  private tutorialMarkup = '';
   constructor(private scene: MapScene, private start: (settings: Settings) => void) {
-    document.querySelector('#app')!.innerHTML = `<header class="topbar"><b>铸造前线</b><span id="network-status" role="status"></span><div id="resources"></div><button data-action="overview">全图</button><button data-action="end">结束本局</button></header><main><section id="map" aria-label="战略地图"><div id="line-tools" hidden></div><div id="toast" role="status"></div><div id="debug" hidden></div></section><aside id="sidebar" hidden aria-label="当前选择"></aside></main><section id="menu" class="veil"></section>`;
+    document.querySelector('#app')!.innerHTML = `<header class="topbar"><b>铸造前线</b><span id="network-status" role="status"></span><div id="resources"></div><button data-action="overview">全图</button><button data-action="end">结束本局</button></header><main><section id="map" aria-label="战略地图"><div id="line-tools" hidden></div><div id="toast" role="status"></div><div id="debug" hidden></div></section><aside id="sidebar" hidden aria-label="当前选择"></aside></main><section id="tutorial" hidden aria-label="新手教程"></section><section id="menu" class="veil"></section>`;
     document.querySelector('#app')!.addEventListener('contextmenu', event => event.preventDefault(), true);
     document.querySelector('#app')!.addEventListener('pointerdown', e => {
       if ((e.target as HTMLElement).closest('button, input, select')) this.controlHeld = true;
@@ -48,12 +52,12 @@ export class GameUI {
       if (e.key === 'Delete') this.scene.deleteSelected();
     });
   }
-  bind(world: World, player = 0) { this.world = world; this.player = this.scene.player = player; this.selected = -1; this.scene.selected = -1; this.resultShown = false; this.active = true; this.scene.enabled = true; document.querySelector<HTMLElement>('#menu')!.hidden = true; this.render(true); }
+  bind(world: World, player = 0) { this.world = world; this.tutorial = world.settings.tutorial ? new Tutorial(world) : undefined; this.tutorialMarkup = ''; this.player = this.scene.player = player; this.selected = -1; this.scene.selected = -1; this.resultShown = false; this.active = true; this.scene.enabled = true; document.querySelector<HTMLElement>('#menu')!.hidden = true; this.render(true); }
   home() {
     if (this.online) { this.network!.leave(); this.online = false; this.player = this.scene.player = 0; this.send = command => submitLocal(this.world, this.player, command); }
     this.active = false; this.scene.enabled = false; this.scene.cancelDrag(); this.select(-1);
     const menu = document.querySelector<HTMLElement>('#menu')!; menu.hidden = false;
-    menu.innerHTML = `<div class="menu-card"><p class="eyebrow">FORGEFRONT</p><h1>铸造前线</h1><button class="primary wide" data-action="multiplayer">联机对局</button><button class="wide" data-action="setup">单人对局</button><button class="wide" data-action="training">装备试验场</button></div>`;
+    menu.innerHTML = `<div class="menu-card"><p class="eyebrow">FORGEFRONT</p><h1>铸造前线</h1><button class="wide" data-action="tutorial">新手教程</button><button class="primary wide" data-action="multiplayer">联机对局</button><button class="wide" data-action="setup">单人对局</button><button class="wide" data-action="training">装备试验场</button></div>`;
   }
   enterNetwork() {
     this.online = true; this.active = false; this.scene.enabled = false;
@@ -93,11 +97,14 @@ export class GameUI {
       const value = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
       this.start({ seed: Number(value('start-seed')), count: Number(value('start-count')), enemies: Number(value('start-enemies')), difficulty: value('start-difficulty') as Settings['difficulty'] }); return;
     }
-    if (action === 'training') { this.start({ seed: 4521, count: 10, enemies: 1, difficulty: 'normal', training: true }); this.select(this.world.factions[0].hq); return; }
+    if (action === 'tutorial') { this.start({ seed: 4521, count: 40, enemies: 1, difficulty: 'normal', tutorial: true }); return; }
+    if (action === 'tutorial-next' && this.tutorial?.step === 0) { this.tutorial.step++; this.render(true); return; }
+    if (action === 'tutorial-focus' && this.tutorial) { this.scene.focus(this.tutorial.steps[this.tutorial.step].province); return; }
+    if (action === 'training') { this.start({ seed: 4521, count: 40, enemies: 1, difficulty: 'normal', training: true }); this.select(this.world.factions[0].hq); return; }
     if (!this.active) return;
     if (action === 'select-route') { this.scene.selectedRoute = Number(id); this.scene.selectedWaypoint = -1; this.render(true); return; }
     if (action === 'overview') { this.scene.fit(); return; }
-    if (action === 'end') { if (this.online) this.report(this.send({ type: 'surrender' })); else { endMatch(this.world); this.showResult(true); } return; }
+    if (action === 'end') { if (this.tutorial) this.home(); else if (this.online) this.report(this.send({ type: 'surrender' })); else { endMatch(this.world); this.showResult(true); } return; }
     if (action === 'close') { this.select(-1); return; }
     if (action === 'delete-point') { this.scene.deleteSelected(); return; }
     if (action === 'delete-route') { this.report(this.send({ type: 'disconnect', route: this.scene.selectedRoute })); this.scene.selectedRoute = -1; this.scene.selectedWaypoint = -1; this.render(true); return; }
@@ -131,10 +138,22 @@ export class GameUI {
     const markup = `<span class="route-caption">线路 ${routeNumber(this.world, this.scene.selectedRoute)}</span>` + (this.scene.selectedWaypoint >= 0 ? '<button data-action="delete-point">删除路径点</button>' : '<button data-action="reset-route">恢复最短路</button><button data-action="delete-route">删除连线</button>');
     if (!this.controlHeld && markup !== this.lineMarkup) { tools.innerHTML = markup; this.lineMarkup = markup; }
   }
+  private renderTutorial() {
+    const panel = document.querySelector<HTMLElement>('#tutorial')!;
+    panel.hidden = !this.tutorial || !this.active;
+    this.scene.tutorialTarget = -1;
+    if (panel.hidden) return;
+    const t = this.tutorial!; t.update(this.selected);
+    const step = t.steps[t.step], finished = t.step === t.steps.length - 1;
+    this.scene.tutorialTarget = step.province;
+    const markup = `<div class="tutorial-heading"><b>新手教程${finished ? '' : ` · ${t.step + 1}/${t.steps.length - 1}`}</b><button data-action="home" aria-label="退出教程">×</button></div><p role="status">${step.text}</p><div class="tutorial-actions">${finished ? '<button class="primary" data-action="home">完成教程</button>' : `${t.step === 0 ? '<button class="primary" data-action="tutorial-next">开始练习</button>' : ''}<button data-action="tutorial-focus">定位目标</button>`}<button data-action="tutorial">重新开始</button></div>`;
+    if (markup !== this.tutorialMarkup) { panel.innerHTML = markup; this.tutorialMarkup = markup; if (step.province >= 0) this.scene.focus(step.province); }
+  }
   render(force = false) {
     if (!this.world) return;
+    this.renderTutorial();
     const w = this.world, p = w.provinces[this.selected], panel = document.querySelector<HTMLElement>('#sidebar')!;
-    document.querySelector('#resources')!.innerHTML = `<span>黄金 <b>${Math.floor(w.factions[this.player]?.gold ?? 0)}</b></span><span>军队 <b>${allTroops(w).filter(s => s.owner === this.player && canFight(s)).length}</b></span><span>${clock(w.time)}</span>`;
+    document.querySelector('#resources')!.innerHTML = `<span>黄金 <b>${w.settings.training ? '∞' : Math.floor(w.factions[this.player]?.gold ?? 0)}</b></span><span>军队 <b>${allTroops(w).filter(s => s.owner === this.player && canFight(s)).length}</b></span><span>${clock(w.time)}</span>`;
     const selected = allTroops(w).filter(s => canFight(s) && this.scene.selectedUnits.has(s.id));
     this.scene.selectedUnits = new Set(selected.map(s => s.id));
     const show = (!!p || selected.length > 0) && this.active;
