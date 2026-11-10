@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canFight, EFFECTS, WEAPONS } from '../src/content/equipment.ts';
-import { createWorld, soldier, stepWorld, bombard, ceaseFire, trainingBattle } from '../src/sim/world.ts';
+import { createWorld, soldier, stepWorld, bombard, orderUnits, trainingBattle } from '../src/sim/world.ts';
 import { addBattle, reinforce, stepBattle } from '../src/sim/combat.ts';
 import { artilleryError, fireAttack, hurtBuilding, stepArtillery, stepAttacks, resolveDeaths } from '../src/sim/attacks.ts';
 import { distance } from '../src/sim/map.ts';
@@ -41,6 +41,12 @@ test('plain shots stop at the first enemy and pierce reaches three enemies befor
 test('projectiles never travel farther than their remaining lifetime', () => {
   const { w, enemies } = range([], [[10, 0]]); w.projectiles[0].life = .01;
   stepAttacks(w); assert.equal(enemies[0].hp, 1000); assert.equal(w.projectiles.length, 0);
+});
+
+test('a blast hits nearby soldiers and leaves soldiers outside its radius unharmed', () => {
+  const { w, enemies } = range(['blast'], [[10, 0], [10, 3.24], [10, 7]]);
+  shots(w, 1);
+  assert.ok(enemies[0].hp < 1000); assert.ok(enemies[1].hp < 1000); assert.equal(enemies[2].hp, 1000);
 });
 
 test('split creates finite real branches and divides the same output budget', () => {
@@ -121,7 +127,7 @@ test('launched artillery survives its source and hits garrison, reserves, unarme
   const enemy = () => ({ ...soldier(w, 1), hp: 1000, position: { ...point } });
   const garrison = enemy(), mobile = enemy(), naked = { ...enemy(), weapon: null, ammo: null, recruit: true }, reserve = enemy(), marching = enemy(), friend = { ...enemy(), owner: 0 };
   target.troops = [garrison, naked, friend]; target.mobile = [mobile];
-  w.battles.push({ province: target.id, fighters: [], reserve: [reserve], wave: 0, nextDeploy: [], models: true, shots: 0, losses: [0, 0] });
+  w.battles.push({ province: target.id, fighters: [], reserve: [reserve], nextDeploy: [], models: true, shots: 0, losses: [0, 0] });
   w.shipments.push({ id: w.nextId++, owner: 1, from: target.id, to: home.id, path: [target.id, home.id], leg: 0, ...point, troops: [marching] });
   assert.equal(bombard(w, [gun.id], target.id, point), null); stepArtillery(w); assert.equal(w.projectiles.length, 1);
   home.troops = []; home.owner = 1; shots(w, 5);
@@ -146,8 +152,10 @@ test('bombardment disables production without capture, then repairs or yields to
   assert.equal(target.owner, 0); assert.equal(target.hp, 1000);
 });
 
-test('cease fire cancels orders, and artillery training creates a usable cross-province firing position', () => {
-  const { w, target, gun } = artillery(); bombard(w, [gun.id], target.id); ceaseFire(w, [gun.id]); stepArtillery(w); assert.equal(w.projectiles.length, 0);
+test('moving artillery to allied land cancels its order, and training creates a usable firing position', () => {
+  const { w, home, target, gun } = artillery(); bombard(w, [gun.id], target.id);
+  const destination = home.neighbors.find(id => w.provinces[id].owner === 0)!;
+  assert.equal(orderUnits(w, [gun.id], destination), null); stepArtillery(w); assert.equal(w.projectiles.length, 0);
   const id = trainingBattle(w, { weapon: 'launcher', ammo: 'round', effects: ['lob', 'blast'] }, 4);
   stepArtillery(w); assert.equal(w.projectiles.length, 4); assert.ok(w.projectiles.every(p => distance(p.origin, p.aim) >= 65));
   assert.equal(w.provinces[id].owner, 1);

@@ -1,6 +1,5 @@
 import { sin, cos, atan2, hypot } from './math.ts';
 import { ARTILLERY_MAX, ARTILLERY_MIN, PAYLOADS, WEAPONS, canFight } from '../content/equipment.ts';
-import type { Effect } from '../content/equipment.ts';
 import type { Point, Projectile, Soldier, World, VisualEffect, Field, ArtilleryOrder } from './types.ts';
 import { STEP } from './types.ts';
 import { distance, inside } from './map.ts';
@@ -30,7 +29,7 @@ export function hurt(w: World, target: AttackTarget, owner: number, amount: numb
 }
 export function hurtBuilding(w: World, province: number, owner: number, amount: number, point = fortPosition(w.provinces[province]), showHit = true) {
   const p = w.provinces[province]; if (p.owner === owner) return;
-  p.hp = Math.max(0, p.hp - amount); p.lastHit = w.time; p.capturedBy = owner;
+  p.hp = Math.max(0, p.hp - amount); p.lastHit = w.time;
   if (showHit) visual(w, 'fort-hit', point);
 }
 function chill(s: Soldier, amount = 1) {

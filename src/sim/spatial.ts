@@ -13,7 +13,6 @@ export const SOLDIER_SIZE = 2.7;
 export const BATTLE_SPACING = SOLDIER_SIZE * 1.2;
 export const troopCenter = (troops: Soldier[]): Point => ({ x: troops.reduce((sum, s) => sum + s.position!.x, 0) / troops.length, y: troops.reduce((sum, s) => sum + s.position!.y, 0) / troops.length });
 export const buildingWidth = (p: Province) => p.building === 'hq' ? 36 : p.building ? 32 : 22;
-export const troopSize = (_p: Province) => SOLDIER_SIZE;
 export const fortPosition = (p: Province): Point => { const f = battleFrame(p); return { x: f.x + FORT.x * f.scale, y: f.y + FORT.y * f.scale }; };
 export const toBattle = (p: Province, point: Point): Point => { const f = battleFrame(p); return { x: (point.x - f.x) / f.scale, y: (point.y - f.y) / f.scale }; };
 export const toWorld = (p: Province, point: Point): Point => { const f = battleFrame(p); return { x: f.x + point.x * f.scale, y: f.y + point.y * f.scale }; };

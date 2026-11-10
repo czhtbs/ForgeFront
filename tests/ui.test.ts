@@ -282,7 +282,7 @@ test('the sword army icon uses the same portrait frame path as ranged units with
   const portrait = { setFrame(frame) { frames.push(frame); } }, root = { setDepth() { return this; }, setVisible() { return this; }, setPosition() { return this; }, setScale() { return this; } };
   scene.add = { image: () => portrait, container: () => root }; scene.text = (_point, content) => labels.push(content);
   scene.groupIcon({ x: 100, y: 100 }, soldier(w, 0, 'hilt'), 12, true);
-  assert.deepEqual(frames, [6]); assert.ok(labels.includes('12')); assert.ok(!labels.includes('剑'));
+  assert.deepEqual(frames, [3]); assert.ok(labels.includes('12')); assert.ok(!labels.includes('剑'));
 });
 
 test('damage sprites are reused, culled offscreen and hidden when their effect expires', () => {

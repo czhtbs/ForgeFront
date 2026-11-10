@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { ITEMS, itemName } from '../src/content/equipment.ts';
@@ -13,12 +13,10 @@ const review = new URL('../docs/art-direction/2026-11-ui-refinement/', import.me
 const original = new URL('generated-originals/', review), png = new URL('generated-png600/', review);
 const production = new URL('generated-webp600/', review);
 for (const dir of [original, png, production]) mkdirSync(dir, { recursive: true });
-const sources = JSON.parse(readFileSync(new URL('image-sources.json', review), 'utf8'));
 const keys = [...ITEMS, 'barracks', 'launcherWorks', 'attachmentWorks', 'mine'];
 const rows = [];
 for (const key of keys) {
-  assert.ok(sources[key], `Missing generated source: ${key}`);
-  const source = new URL(`${key}.png`, original); copyFileSync(sources[key], source);
+  const source = new URL(`${key}.png`, original);
   const metadata = await sharp(fileURLToPath(source)).metadata();
   assert.ok(metadata.width >= 1000 && metadata.width / metadata.height > 1.8, key);
   const resized = await sharp(fileURLToPath(source)).resize(600, 300, { fit: 'contain', background: '#eef1e3' }).png().toBuffer();

@@ -1,13 +1,11 @@
 import { sin, cos, atan2 } from './math.ts';
 import { WEAPONS, PAYLOADS, canFight, isWorkshop } from '../content/equipment.ts';
-import { BATTLE_CAP, BATTLE_H, BATTLE_W, STEP, FORT } from './types.ts';
+import { BATTLE_CAP, STEP, FORT } from './types.ts';
 import type { Battle, Fighter, Point, Soldier, World } from './types.ts';
 import { MOVE_SPEED, battleFrame, BATTLE_SPACING, buildingWidth, assignSlots, formation, toBattle, toWorld, SOLDIER_SIZE } from './spatial.ts';
 import { distance, inside } from './map.ts';
 import { fireAttack, hurt, hurtBuilding, visual } from './attacks.ts';
-export { segmentDistance } from './attacks.ts';
 import { BUILDING_HITS } from '../content/building-hits.ts';
-export const SPLASH_RADIUS = 30;
 export function random(w: World) { w.rng = (Math.imul(w.rng, 1664525) + 1013904223) >>> 0; return w.rng / 4294967296; }
 export const DEPLOY_TICKS = 6;
 export function queueReinforcements(w: World, b: Battle, incoming: Soldier[], entry?: Point) {
@@ -54,7 +52,7 @@ export function addBattle(w: World, province: number, incoming: Soldier[], entry
   let battle = w.battles.find(b => b.province === province);
   if (!battle) {
     const p = w.provinces[province]; assignSlots(p, [...p.troops, ...p.mobile]);
-    battle = { province, fighters: [], reserve: [], wave: 0, nextDeploy: [], models: true, shots: 0, losses: w.factions.map(() => 0) };
+    battle = { province, fighters: [], reserve: [], nextDeploy: [], models: true, shots: 0, losses: w.factions.map(() => 0) };
     queueReinforcements(w, battle, [...p.troops, ...p.mobile].filter(canFight));
     p.troops = p.troops.filter(s => !canFight(s)); p.mobile = p.mobile.filter(s => !canFight(s));
     w.battles.push(battle);

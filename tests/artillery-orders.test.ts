@@ -59,7 +59,7 @@ test('artillery uses a fighting targets current world coordinates and reacquires
   const w = quiet(), source = w.provinces[0], target = w.provinces.find(p => distance(p, source) > 120 && distance(p, source) < 240);
   const shooter = gun(w, source); source.troops = [shooter]; target.owner = 1;
   const enemies = [0, 1].map(i => ({ ...soldier(w, 1), hp: 1000, ...toBattle(target, { x: target.x + i * 5, y: target.y }), position: { x: 0, y: 0 }, angle: 0, cooldown: 100, recoil: 0, suppressed: 0 }));
-  w.battles.push({ province: target.id, fighters: enemies, reserve: [], wave: 0, nextDeploy: [], models: true, shots: 0, losses: [0, 0] });
+  w.battles.push({ province: target.id, fighters: enemies, reserve: [], nextDeploy: [], models: true, shots: 0, losses: [0, 0] });
   assert.equal(orderUnits(w, [shooter.id], target.id, 0, target, enemies.map(s => s.id)), null);
   enemies[0].x += 100; stepArtillery(w); assert.ok(w.projectiles[0].aim.x > target.x + 10);
   for (let i = 0; i < 150; i++) stepAttacks(w);

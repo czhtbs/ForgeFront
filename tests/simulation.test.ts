@@ -5,10 +5,10 @@ import { createWorld, stepWorld, dispatch, build, connect, totalTroops, endMatch
 import { configuration, validateLoadout, canFight, equipmentKey, unitKey, WEAPONS } from '../src/content/equipment.ts';
 import { fireAttack, stepAttacks, resolveDeaths } from '../src/sim/attacks.ts';
 import { fortPosition } from '../src/sim/spatial.ts';
-import { addBattle, reinforce, segmentDistance, stepBattle, DEPLOY_TICKS } from '../src/sim/combat.ts';
+import { addBattle, reinforce, stepBattle, DEPLOY_TICKS } from '../src/sim/combat.ts';
 import { BATTLE_CAP, FORT } from '../src/sim/types.ts';
 import { routeGeometry, editedWaypoints } from '../src/render/geometry.ts';
-import { MOVE_SPEED, battleFrame, formation, troopSize, assignSlots, toWorld, toBattle, SOLDIER_SIZE } from '../src/sim/spatial.ts';
+import { MOVE_SPEED, battleFrame, formation, assignSlots, toWorld, toBattle, SOLDIER_SIZE } from '../src/sim/spatial.ts';
 import { toggleUnits, orderGesture } from '../src/ui/interaction.ts';
 import { movementPath } from '../src/sim/map.ts';
 import { stepLocalWorld } from '../src/sim/lockstep.ts';
@@ -220,7 +220,6 @@ test('fixed queues keep every existing slot when soldiers are added or removed',
   for(const count of [12,48]) for(const p of createMap(count,4521)) {
     const first=formation(p,40), full=formation(p,60);
     assert.deepEqual(first,full.slice(0,40));assert.ok(full.every(point=>inside(point,p.polygon)));
-    assert.equal(troopSize(p),SOLDIER_SIZE);
   }
   const w=quiet(),p=w.provinces[w.factions[0].hq], before=p.troops.map(s=>({id:s.id,slot:s.slot,position:{...s.position}}));
   const removed=p.troops.splice(5,1)[0];p.troops.push(soldier(w,0));assignSlots(p,p.troops);

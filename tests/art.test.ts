@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createMap, mapBounds, inside, CELL_AREA, MAP_SIZES, coastalCells, distance } from '../src/sim/map.ts';
 import { polygonArea, formation, fortPosition, SOLDIER_SIZE, battleFrame } from '../src/sim/spatial.ts';
 import { decorations, buildingWidth, appear, revealedLine, UNIT_WEAPONS, ARMY_PORTRAITS, unitFrame, portraitFrame } from '../src/render/art.ts';
@@ -83,12 +83,11 @@ test('supply routes attach to actual buildings and reveal continuously along the
   assert.ok(appear(.15, .5) < appear(.3, .5));
 });
 
-test('game consumes new assets and all weapon/effect parts are available', () => {
-  for (const name of ['hq', 'barracks', 'workshop', 'mine', 'fort', 'tree', 'pine', 'mountain', 'army-portraits', 'soldiers', 'soldier-debris', 'equipment-modules']) {
+test('game assets exist and contain PNG data', () => {
+  for (const name of ['hq', 'barracks', 'workshop', 'mine', 'fort', 'tree', 'pine', 'mountain', 'army-portraits', 'soldiers', 'soldier-debris']) {
     const png = readFileSync(new URL(`../public/assets/b-style/${name}.png`, import.meta.url));
     assert.equal(png.readUInt32BE(0), 0x89504e47); assert.ok(png.length > 100);
   }
-  for (const name of ['body', ...UNIT_WEAPONS, 'pierce', 'blast', 'gas', 'split']) assert.ok(existsSync(new URL(`../public/assets/b-style/parts/${name}.svg`, import.meta.url)));
   const scene = readFileSync(new URL('../src/render/MapScene.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(scene, /private port\(|assets\/unit-parts/);
 });
@@ -115,6 +114,12 @@ test('soldier and army portrait atlases cover all six factions and the sword ico
   const image = readFileSync(new URL('../public/assets/b-style/soldiers.png', import.meta.url)), frames = image.readUInt32BE(16) / 160 * image.readUInt32BE(20) / 160;
   const portraits = readFileSync(new URL('../public/assets/b-style/army-portraits.png', import.meta.url));
   assert.equal(frames, FACTION_COLORS.length * UNIT_WEAPONS.length * 4); assert.equal(portraits.readUInt32BE(16), ARMY_PORTRAITS.length * 32);
-  const unit = { owner: 5, weapon: 'hilt', ammo: 'blade', effects: [] };
-  assert.ok(unit.owner * 24 + unitFrame(unit, 1) < frames); assert.equal(ARMY_PORTRAITS[portraitFrame(unit)], 'sword');
+  const columns = image.readUInt32BE(16) / 160;
+  for (let owner = 0; owner < FACTION_COLORS.length; owner++) {
+    for (const loadout of [{ weapon: null, ammo: null, effects: [] }, { weapon: 'launcher', ammo: 'round', effects: [] }, { weapon: 'launcher', ammo: 'round', effects: ['lob'] }, { weapon: 'hilt', ammo: 'blade', effects: [] }]) {
+      const unit = { owner, ...loadout };
+      for (const recoil of [0, 1]) assert.equal(Math.floor(unitFrame(unit, recoil) / columns), owner);
+      if (unit.weapon === 'hilt') assert.equal(ARMY_PORTRAITS[portraitFrame(unit)], 'sword');
+    }
+  }
 });

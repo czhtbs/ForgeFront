@@ -3,11 +3,11 @@ import { fortPosition, SOLDIER_SIZE } from '../sim/spatial.ts';
 import type { Point, Province, Soldier, Casualty } from '../sim/types.ts';
 import { canFight } from '../content/equipment.ts';
 
-export const UNIT_WEAPONS = ['none', 'rifle', 'mg', 'sniper', 'rocket', 'flame'];
+export const UNIT_WEAPONS = ['none', 'rifle', 'rocket'];
 export const ARMY_PORTRAITS = [...UNIT_WEAPONS, 'sword'];
 export { buildingWidth } from '../sim/spatial.ts';
 export const spriteWeapon = (s: Pick<Soldier, 'weapon'> & Partial<Pick<Soldier, 'effects' | 'ammo'>>) => !s.weapon || s.weapon === 'hilt' ? 'none' : s.effects?.includes('lob') ? 'rocket' : 'rifle';
-export const unitFrame = (s: Soldier, recoil = 0) => UNIT_WEAPONS.indexOf(canFight(s) ? spriteWeapon(s) : 'none') * 4 + Math.round(recoil * 3);
+export const unitFrame = (s: Soldier, recoil = 0) => (s.owner * UNIT_WEAPONS.length + UNIT_WEAPONS.indexOf(canFight(s) ? spriteWeapon(s) : 'none')) * 4 + Math.round(recoil * 3);
 export const portraitFrame = (s: Soldier) => ARMY_PORTRAITS.indexOf(s.weapon === 'hilt' && canFight(s) ? 'sword' : canFight(s) ? spriteWeapon(s) : 'none');
 export function swordPose(s: Soldier, recoil: number) {
   const facing = s.angle ?? 0, t = 1 - recoil;
@@ -20,7 +20,7 @@ export const appear = (age: number, duration: number) => { const t = Math.max(0,
 export const unitDetail = (zoom: number) => appear(SOLDIER_SIZE * zoom - 6, 4);
 export function deathFragments(c: Casualty, age: number) {
   const rand = randomSource(c.id * 417), t = Math.min(.8, age), fade = 1 - appear(age - 3.8, 1.2);
-  const weapon = ['rifle', 'mg', 'sniper', 'rocket', 'flame'].indexOf(spriteWeapon(c));
+  const weapon = ['rifle', 'rocket'].indexOf(spriteWeapon(c));
   const frames = [0, 1, ...(weapon >= 0 ? [2 + weapon] : [])];
   return frames.map((frame, i) => {
     const angle = c.angle + (rand() - .5) * 3.6, reach = SOLDIER_SIZE * (i === 0 ? .37 : .56 + rand() * .74) * c.force;

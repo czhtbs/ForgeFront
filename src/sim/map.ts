@@ -70,7 +70,7 @@ export function createMap(count: number, seed: number): Province[] {
     return { x: x / (3 * area), y: y / (3 * area) };
   });
   const shapes = polygons(), names = ['白桦', '北岭', '石桥', '松原', '河湾', '青麓', '长滩', '新港', '高原', '赤岩', '银谷', '西岗'];
-  const cells = seeds.map((p, id): Province => ({ ...p, id, name: `${names[id % names.length]} ${String(id + 1).padStart(2, '0')}`, polygon: shapes[id], neighbors: [], terrain: Math.floor(rand() * 4), owner: -1, hp: 1000, building: null, level: 1, troops: [], mobile: [], output: 'rifle', assembly: {}, recruitment: 0, lastHit: -10, capturedBy: -1 }));
+  const cells = seeds.map((p, id): Province => ({ ...p, id, name: `${names[id % names.length]} ${String(id + 1).padStart(2, '0')}`, polygon: shapes[id], neighbors: [], terrain: Math.floor(rand() * 4), owner: -1, hp: 1000, building: null, level: 1, troops: [], mobile: [], output: 'rifle', assembly: {}, recruitment: 0, lastHit: -10 }));
   for (const a of cells) for (const b of cells) if (a.id < b.id && a.polygon.filter(p => b.polygon.some(q => distance(p, q) < .01)).length >= 2) { a.neighbors.push(b.id); b.neighbors.push(a.id); }
   const edges = new Map<string, Point[]>();
   const bend = (p: Point) => ({ x: p.x + 3.2 * Math.sin(p.y / 11 + phase) + Math.sin(p.y / 4.5 - phase), y: p.y + 3.2 * Math.sin(p.x / 13 - phase) + .8 * Math.sin(p.x / 5.4 + phase) });

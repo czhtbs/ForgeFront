@@ -38,13 +38,13 @@ export function runAI(w: World, owner: number, act: (command: Command) => string
     if (active.has(p.id)) continue;
     const troops = [...p.troops, ...p.mobile].filter(canFight), guns = troops.filter(s => s.effects.includes('lob'));
     for (const target of w.provinces.filter(q => q.owner !== owner).sort((a, b) => distance(p, a) - distance(p, b))) {
-      if (guns.length && !act({ type: 'armyOrder', units: guns.map(s => s.id), province: target.id, point: { x: target.x, y: target.y } })) { faction.intent = `炮击 ${target.name}`; break; }
+      if (guns.length && !act({ type: 'armyOrder', units: guns.map(s => s.id), province: target.id, point: { x: target.x, y: target.y } })) break;
     }
     const ground = troops.filter(s => !s.effects.includes('lob')), count = ground.length;
     const targets = w.provinces.filter(q => { if (q.owner === owner) return false; const path = movementPath(w, p.id, q.id, owner); return path.length > 1 && path.slice(1, -1).every(id => w.provinces[id].owner === owner); }).sort((a, b) => (a.building === 'hq' ? -100 : a.hp) - (b.building === 'hq' ? -100 : b.hp));
     if (targets.length && count > 20) {
       const target = targets.find(t => count > t.troops.filter(canFight).length * 1.15 + 10);
-      if (target) { act({ type: 'armyOrder', units: [...p.mobile, ...p.troops].filter(s => ground.includes(s)).slice(0, Math.floor(count * .8)).map(s => s.id), province: target.id }); faction.intent = `进攻 ${target.name}`; }
+      if (target) { act({ type: 'armyOrder', units: [...p.mobile, ...p.troops].filter(s => ground.includes(s)).slice(0, Math.floor(count * .8)).map(s => s.id), province: target.id }); }
     } else if (!targets.length && count > 25 && front.length) {
       const dest = [...front].sort((a, b) => a.troops.length - b.troops.length)[0];
       if (dest.id !== p.id) act({ type: 'armyOrder', units: [...p.mobile, ...p.troops].filter(s => ground.includes(s)).slice(0, count - 12).map(s => s.id), province: dest.id });

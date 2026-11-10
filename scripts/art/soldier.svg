@@ -22,12 +22,7 @@
  <rect x="-17" y="-92" width="35" height="14" rx="3" fill="url(#tan)"/><rect x="-17" y="78" width="35" height="14" rx="3" fill="url(#tan)"/>
  <path d="M-53-46Q-20-67 28-46" fill="none" stroke="#b0b69b" stroke-width="4"/>
 </g>
-<g transform="translate(1250 150)" stroke="#28392f" stroke-width="4">
- <rect x="-92" y="-100" width="184" height="200" rx="30" fill="url(#olive)"/><rect x="-65" y="-73" width="130" height="146" rx="16" fill="#64714f"/>
- <path d="M-36-100v200M36-100v200" stroke="#b9ac85" stroke-width="17"/><path d="M-90 0H90" stroke="#b9ac85" stroke-width="13"/>
- <rect x="-46" y="-15" width="21" height="30" rx="3" fill="url(#steel)"/><rect x="25" y="-15" width="21" height="30" rx="3" fill="url(#steel)"/>
-</g>
-<!-- Five weapons are top views: grips and magazines below the receiver are occluded. -->
+<!-- Weapons are top views: grips and magazines below the receiver are occluded. -->
 <g transform="translate(0 450)" stroke="#20332f" stroke-width="3" stroke-linejoin="round">
  <path d="M47-26 107-22 138-12V12L107 22 47 26Z" fill="url(#tan)"/><rect x="125" y="-9" width="46" height="18" fill="#3e5047"/>
  <path d="M162-21h108l20 9v24l-20 9H162Z" fill="url(#steel)"/><rect x="177" y="-11" width="91" height="22" rx="4" fill="#7a8572"/>
@@ -35,37 +30,10 @@
  <path d="M357-6h70v12h-70Z" fill="url(#steel)"/><rect x="425" y="-10" width="29" height="20" rx="4" fill="url(#steel)"/>
  <rect x="208" y="-8" width="24" height="16" rx="3" fill="#c2bf97"/><path d="M299-18v36M332-18v36" stroke="#263a31"/>
 </g>
-<g transform="translate(500 450)" stroke="#20332f" stroke-width="3" stroke-linejoin="round">
- <path d="M40-30 108-22 141-12v24l-33 10-68 8Z" fill="url(#steel)"/><rect x="128" y="-10" width="45" height="20" fill="#415147"/>
- <rect x="165" y="-29" width="126" height="58" rx="7" fill="url(#steel)"/><rect x="178" y="-16" width="98" height="32" rx="4" fill="#7c8771"/>
- <rect x="200" y="26" width="63" height="37" rx="5" fill="url(#olive)"/><path d="M206 31h51M206 43h51" stroke="#cbb77b" stroke-width="5"/>
- <rect x="291" y="-20" width="89" height="40" rx="6" fill="url(#steel)"/><path d="M307-10h12m12 0h12m12 0h12M307 10h12m12 0h12m12 0h12" stroke="#172b28" stroke-width="6"/>
- <path d="M378-7h54v14h-54Z" fill="#61716b"/><rect x="431" y="-13" width="33" height="26" rx="4" fill="url(#steel)"/>
-</g>
-<g transform="translate(1000 450)" stroke="#23362e" stroke-width="3" stroke-linejoin="round">
- <path d="M34-26 100-22 143-11v22l-43 11-66 4Z" fill="url(#olive)"/><rect x="129" y="-7" width="49" height="14" fill="#53624c"/>
- <rect x="176" y="-17" width="111" height="34" rx="6" fill="url(#steel)"/><rect x="285" y="-12" width="67" height="24" rx="6" fill="url(#olive)"/>
- <rect x="187" y="-8" width="103" height="16" rx="7" fill="#192d29"/><rect x="191" y="-12" width="22" height="24" rx="5" fill="url(#steel)"/><rect x="265" y="-14" width="32" height="28" rx="6" fill="url(#steel)"/>
- <circle cx="244" cy="0" r="9" fill="#9ca88e"/><path d="M351-5h100v10H351Z" fill="url(#steel)"/><rect x="449" y="-9" width="30" height="18" rx="4" fill="url(#steel)"/>
-</g>
 <g transform="translate(0 750)" stroke="#26392d" stroke-width="4">
  <rect x="47" y="-24" width="398" height="48" rx="23" fill="url(#olive)"/><rect x="45" y="-32" width="31" height="64" rx="8" fill="url(#steel)"/>
  <rect x="403" y="-33" width="43" height="66" rx="11" fill="url(#steel)"/><rect x="118" y="-28" width="15" height="56" rx="3" fill="#a0a987"/><rect x="337" y="-28" width="13" height="56" rx="3" fill="#c7b966"/>
  <rect x="204" y="-15" width="51" height="30" rx="6" fill="url(#steel)"/><circle cx="227" cy="0" r="6" fill="#aeb89b"/>
  <path d="M150-13h45M270-13h50" stroke="#a0ad7a" stroke-width="3"/>
-</g>
-<g transform="translate(500 750)" stroke="#23362c" stroke-width="4" stroke-linejoin="round">
- <path d="M45 14Q91 14 123 1" fill="none" stroke="#354a40" stroke-width="15"/><path d="M47 10Q85 12 121-2" fill="none" stroke="#80947a" stroke-width="3"/>
- <rect x="123" y="-26" width="142" height="52" rx="13" fill="url(#olive)"/><rect x="153" y="-14" width="82" height="28" rx="5" fill="url(#steel)"/>
- <circle cx="248" cy="0" r="16" fill="#8d5c42"/><circle cx="248" cy="0" r="8" fill="#b58a64"/>
- <path d="M265-11h56v22h-56Z" fill="url(#steel)"/><rect x="320" y="-20" width="102" height="40" rx="9" fill="url(#steel)"/>
- <path d="M336-8h13m14 0h13m14 0h13M336 8h13m14 0h13m14 0h13" stroke="#182d27" stroke-width="5"/><path d="m421-13 34 7v12l-34 7Z" fill="url(#tan)"/>
-</g>
-<g transform="translate(1250 750)" stroke="#28392d" stroke-width="4">
- <rect x="-104" y="-102" width="208" height="204" rx="24" fill="#3f5140"/>
- <rect x="-89" y="-91" width="79" height="182" rx="26" fill="url(#olive)"/><rect x="10" y="-91" width="79" height="182" rx="26" fill="url(#olive)"/>
- <path d="M-87-33h74M13-33h74M-87 33h74M13 33h74" stroke="#b6a77e" stroke-width="13"/>
- <circle cx="-49" cy="-64" r="12" fill="url(#steel)"/><circle cx="49" cy="-64" r="12" fill="url(#steel)"/>
- <path d="M-48 90v19q0 20 30 20h71q43 0 43-44V8" fill="none" stroke="#253c33" stroke-width="12"/>
 </g>
 </svg>

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld, connect, reroute, soldier, stepWorld } from '../src/sim/world.ts';
 import { stepAttacks, resolveDeaths } from '../src/sim/attacks.ts';
-import { addBattle, reinforce, stepBattle, fortAim, SPLASH_RADIUS } from '../src/sim/combat.ts';
+import { addBattle, reinforce, stepBattle, fortAim } from '../src/sim/combat.ts';
 import { battleFrame, BATTLE_SPACING, buildingWidth, fortPosition } from '../src/sim/spatial.ts';
 import { FORT } from '../src/sim/types.ts';
 import { lineLength, pointAlong, supplyLanes, commandRibbon, attackDestination } from '../src/render/geometry.ts';
@@ -84,13 +84,13 @@ test('casualties persist beyond a completed battle, scatter real components, the
   for (let i = 0; i < 151; i++) stepWorld(w); assert.equal(w.casualties.length, 0);
 });
 
-test('combat separation opens a modest gap without exceeding the splash radius', () => {
+test('combat separation opens a modest gap', () => {
   const w = make(), p = w.provinces.find(p => p.owner === -1)!, b = addBattle(w, p.id, []), scale = battleFrame(p).scale;
   const f = (id: number, x: number) => ({ ...soldier(w, id), x, y: 0, angle: 0, cooldown: 1000, recoil: 0, suppressed: 0 });
   b.fighters = [f(0, 200), f(0, 200), f(1, 1500)];
   for (let i = 0; i < 30; i++) stepBattle(w, b); stepAttacks(w); resolveDeaths(w);
   const gap = Math.hypot(b.fighters[0].x - b.fighters[1].x, b.fighters[0].y - b.fighters[1].y) * scale;
-  assert.ok(gap >= BATTLE_SPACING * .98); assert.ok(gap < BATTLE_SPACING * 1.3); assert.ok(SPLASH_RADIUS * scale > BATTLE_SPACING);
+  assert.ok(gap >= BATTLE_SPACING * .98); assert.ok(gap < BATTLE_SPACING * 1.3);
 });
 
 test('fort shots aim and land at different opaque locations on each building sprite', () => {

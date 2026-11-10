@@ -3,14 +3,13 @@ import { configuration, unitKey, canFight, canEquip, WEAPONS, LAUNCHERS, WORKSHO
 import type { Effect, Item, Loadout, Weapon, Ammo, Launcher } from '../content/equipment.ts';
 import { addBattle, stepBattle, queueReinforcements } from './combat.ts';
 import { createMap, distance, inside, movementPath, routePath, shortestPath, mapBounds, coastalCells } from './map.ts';
-import { CAPACITY, FACTION_COLORS, STEP, BATTLE_W, BATTLE_H, FORT } from './types.ts';
+import { CAPACITY, FACTION_COLORS, STEP, FORT } from './types.ts';
 import type { Building, Province, Settings, Soldier, Waypoint, World, Shipment, Point, Route, ArtilleryOrder } from './types.ts';
-import { MOVE_SPEED, SOLDIER_SIZE, assignSlots, formation, fortPosition, moveSoldier, marchOffset, toWorld, troopCenter } from './spatial.ts';
+import { MOVE_SPEED, assignSlots, formation, fortPosition, moveSoldier, marchOffset, toWorld, troopCenter } from './spatial.ts';
 import { artilleryAim, artilleryError, attackTargets, stepArtillery, stepAttacks, resolveDeaths } from './attacks.ts';
-export function message(w: World, text: string) { w.messages.unshift({ time: w.time, text }); w.messages.length = Math.min(40, w.messages.length); }
 export function soldier(w: World, owner: number, weapon: Weapon = 'launcher', ammo: Ammo = weapon === 'hilt' ? 'blade' : 'round'): Soldier { return { id: w.nextId++, owner, hp: 100, weapon, ammo, effects: [] }; }
 export function createWorld(settings: Settings): World {
-  const w: World = { settings, time: 0, tick: 0, nextId: 1, rng: settings.seed >>> 0, provinces: createMap(settings.count, settings.seed), factions: [], routes: [], shipments: [], battles: [], flows: [], casualties: [], projectiles: [], fields: [], visuals: [], messages: [], winner: null, stats: [], result: null };
+  const w: World = { settings, time: 0, tick: 0, nextId: 1, rng: settings.seed >>> 0, provinces: createMap(settings.count, settings.seed), factions: [], routes: [], shipments: [], battles: [], flows: [], casualties: [], projectiles: [], fields: [], visuals: [], winner: null, stats: [], result: null };
   const occupied = new Set<number>();
   const bounds = mapBounds(w.provinces), coast = coastalCells(w.provinces);
   for (let id = 0; id <= settings.enemies; id++) {
@@ -19,7 +18,7 @@ export function createWorld(settings: Settings): World {
     const hq = w.provinces.filter(p => !occupied.has(p.id) && p.neighbors.some(n => !occupied.has(n))).sort((a, b) => Number(coast.has(a.id)) - Number(coast.has(b.id)) || distance(a, target) - distance(b, target))[0];
     const mine = w.provinces[hq.neighbors.find(n => !occupied.has(n))!];
     occupied.add(hq.id); occupied.add(mine.id);
-    w.factions.push({ id, name: id === 0 ? '玩家' : `AI ${id}`, color: FACTION_COLORS[id], gold: 350, hq: hq.id, alive: true, ai: id !== 0 && !settings.training, intent: '整备与扩张' });
+    w.factions.push({ id, name: id === 0 ? '玩家' : `AI ${id}`, color: FACTION_COLORS[id], gold: 350, hq: hq.id, alive: true, ai: id !== 0 && !settings.training });
     w.stats.push({ kills: 0, losses: 0 });
     hq.owner = id; hq.building = 'hq'; mine.owner = id; mine.building = 'mine';
     hq.troops = Array.from({ length: 40 }, () => soldier(w, id)); assignSlots(hq, hq.troops);
@@ -73,7 +72,7 @@ export function build(w: World, id: number, building: NonNullable<Building>, own
   if (!w.settings.training && f.gold < cost) return `需要 ${cost} 黄金`;
   if (!w.settings.training) f.gold -= cost; p.building = building; p.level = 1; p.assembly = {};
   if (isWorkshop(building)) p.output = WORKSHOP_ITEMS[building][0];
-  message(w, `${f.name}在 ${p.name} 开始建设生产设施`); return null;
+  return null;
 }
 export function upgrade(w: World, id: number, owner = 0): string | null {
   const p = w.provinces[id], cost = p.level * 100;
@@ -219,7 +218,6 @@ function advanceArtillery(w: World) {
     }
   }
 }
-export function ceaseFire(w: World, ids: number[]) { const selected = new Set(ids); for (const s of allTroops(w)) if (selected.has(s.id)) s.bombard = undefined; }
 function defeat(w: World, owner: number) {
   const remaining = w.factions.filter(f => f.alive && f.id !== owner);
   if (!w.settings.training && (!w.settings.multiplayer && owner === 0 || remaining.length === 1)) { endMatch(w); w.winner = remaining[0].id; }
@@ -297,7 +295,6 @@ function logistics(w: World) {
       else {
         // Return to the last reached province instead of teleporting past a newly blocked route.
         const home = s.path[Math.max(0, s.leg)]; s.path = [home]; s.leg = -1; s.to = home; next = home;
-        message(w, '路线受阻，部队正在返回');
       }
     }
     const goal = w.provinces[next], gap = distance(s, goal), step = MOVE_SPEED * STEP;

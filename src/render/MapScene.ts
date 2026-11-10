@@ -258,7 +258,7 @@ export class MapScene extends Phaser.Scene {
       let motion = this.unitMotion.get(unit.id);
       if (!motion) { motion = { soldier: unit, born: this.clock, seen: this.clock }; this.unitMotion.set(unit.id, motion); }
       motion.soldier = { ...unit, position: { ...p } }; motion.seen = this.clock;
-      sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setScale(SOLDIER_SIZE / 60).setRotation(angle).setFrame(unit.owner * 24 + unitFrame(unit, recoil)).setAlpha(appear(this.clock - motion.born, .28) * unitDetail(camera.zoom));
+      sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setScale(SOLDIER_SIZE / 60).setRotation(angle).setFrame(unitFrame(unit, recoil)).setAlpha(appear(this.clock - motion.born, .28) * unitDetail(camera.zoom));
       this.unitHits.push({ point: p, province, ids: groups.get(`${unit.owner}/${armyKey(unit)}`)!, owner: unit.owner, shipment, radius: SOLDIER_SIZE * .7 });
       if (unit.weapon === 'hilt') {
         const sword = swordPose(unit, recoil);
@@ -440,7 +440,7 @@ export class MapScene extends Phaser.Scene {
       const soldier = motion.soldier, p = soldier.position!;
       if (!alive.has(id)) { this.unitMotion.delete(id); continue; }
       const alpha = (1 - appear(elapsed, .65)) * detail, sprite = this.unit(unitIndex++);
-      sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setFrame(soldier.owner * 24 + unitFrame(soldier)).setScale(SOLDIER_SIZE / 60).setAlpha(alpha).setRotation(soldier.angle ?? 0);
+      sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setFrame(unitFrame(soldier)).setScale(SOLDIER_SIZE / 60).setAlpha(alpha).setRotation(soldier.angle ?? 0);
     }
     for (let i = this.iconIndex; i < this.armyIcons.length; i++) this.armyIcons[i].root.setVisible(false);
     for (let i = unitIndex; i < this.units.length; i++) this.units[i].root.setVisible(false);

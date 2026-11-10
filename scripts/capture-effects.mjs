@@ -53,7 +53,7 @@ function snapshot(w, units, center, zoom) {
   c.translate(200, 125); c.scale(zoom, zoom); c.translate(-center.x, -center.y);
   c.drawImage(ground, 0, 0);
   for (const unit of units) {
-    const frame = unit.owner * 24 + unitFrame(unit), columns = sprite.width / 160;
+    const frame = unitFrame(unit), columns = sprite.width / 160;
     c.save(); c.translate(unit.position.x, unit.position.y); c.rotate(unit.angle ?? 0); c.scale(SOLDIER_SIZE / 60, SOLDIER_SIZE / 60);
     c.drawImage(sprite, frame % columns * 160, Math.floor(frame / columns) * 160, 160, 160, -55, -80, 160, 160); c.restore();
   }
