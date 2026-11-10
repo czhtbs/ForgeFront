@@ -87,10 +87,14 @@ export class MapScene extends Phaser.Scene {
     this.game.events.on('blur', () => this.cancelDrag());
     this.game.canvas.addEventListener('pointercancel', () => this.cancelDrag());
     this.input.on('wheel', (p: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
-      if (!this.enabled) return;
-      const camera = this.cameras.main, before = camera.getWorldPoint(p.x, p.y);
+      if (!this.enabled || !dy) return;
+      const camera = this.cameras.main;
+      // Phaser updates projection matrices during rendering, not when zoom or scroll is assigned.
+      camera.preRender(); const before = camera.getWorldPoint(p.x, p.y);
       camera.setZoom(Phaser.Math.Clamp(camera.zoom * (dy > 0 ? .85 : 1.18), .35, 16));
+      camera.preRender();
       const after = camera.getWorldPoint(p.x, p.y); camera.scrollX += before.x - after.x; camera.scrollY += before.y - after.y;
+      camera.preRender();
     });
     this.ready = true; if (this.world) this.reset(this.world);
   }

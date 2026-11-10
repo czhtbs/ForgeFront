@@ -13,7 +13,8 @@ function uiFixture() {
   class Element {
     hidden = false; writes = 0; markup = ''; listeners = new Map(); dataset = {}; disabled = false; scrollTop = 0; attributes = new Map();
     classList = { toggle() {}, remove() {} };
-    addEventListener(type, listener) { this.listeners.set(type, listener); }
+    listenerOptions = new Map();
+    addEventListener(type, listener, options) { this.listeners.set(type, listener); this.listenerOptions.set(type, options); }
     setAttribute(name, value) { this.attributes.set(name, value); }
     contains() { return false; }
     closest() { return this; }
@@ -222,7 +223,7 @@ function mapFixture() {
     .replace("import Phaser from 'phaser';", "const Phaser = require('phaser');")
     .replace(/^import \{([^}]+)\} from '([^']+)';/gm, 'const {$1} = require("$2");')
     .replace('export class MapScene', 'exports.MapScene = class MapScene');
-  runInNewContext(code, { exports, require: name => name === 'phaser' ? { Scene: class {} } : require(name), performance });
+  runInNewContext(code, { exports, require: name => name === 'phaser' ? { Scene: class {}, Textures: { FilterMode: { NEAREST: 0 } }, Math: { Clamp: (n, min, max) => Math.max(min, Math.min(max, n)) } } : require(name), performance });
   const scene = new exports.MapScene(), w = createWorld({ seed: 4521, count: 12, enemies: 1, difficulty: 'normal' }), orders = [], links = [];
   w.provinces.forEach(p => { p.owner = 0; p.building = null; });
   const camera = { zoom: 1, scrollX: 0, scrollY: 0, getWorldPoint(x, y) { return { x: x / this.zoom + this.scrollX, y: y / this.zoom + this.scrollY }; } };
@@ -238,6 +239,42 @@ function mapFixture() {
   const pointer = (point, right = false, ctrl = false, shift = false) => ({ ...point, event: { ctrlKey: ctrl, shiftKey: shift, target: { closest: () => null } }, rightButtonDown: () => right, leftButtonDown: () => !right });
   return { scene, w, camera, orders, links, pointer };
 }
+
+test('context menus are cancelled in capture phase throughout the game, including overlays', () => {
+  const { elements } = uiFixture(), app = elements.get('#app');
+  assert.equal(app.listenerOptions.get('contextmenu'), true);
+  for (const target of ['canvas', 'sidebar', 'line-tools', 'menu']) {
+    const event = new Event('contextmenu', { cancelable: true }); Object.defineProperty(event, 'target', { value: target });
+    app.listeners.get('contextmenu')(event); assert.equal(event.defaultPrevented, true);
+  }
+});
+
+test('wheel zoom keeps the cursor anchored with the real Phaser camera, even between render frames', () => {
+  const file = new URL('../node_modules/phaser/src/cameras/2d/Camera.js', import.meta.url), require = createRequire(file), module = { exports: {} };
+  // Only rendering filters need a DOM; use the actual camera, matrices and projection code.
+  runInNewContext(readFileSync(file, 'utf8'), { module, exports: module.exports, require: name => name === '../../gameobjects/components' ? { FilterList: class {} } : require(name) });
+  const camera = new module.exports(27, 19, 1100, 720), { scene } = mapFixture(), handlers = new Map();
+  Object.assign(scene, { cameras: { main: camera }, textures: { get: () => ({ setFilter() {} }) }, scale: { on() {} }, add: { graphics: () => ({ setDepth() { return this; } }) },
+    input: { mouse: { disableContextMenu() {} }, on: (event, fn) => handlers.set(event, fn) }, game: { events: { on() {} }, canvas: { addEventListener() {} } }, reset() {} });
+  scene.create(); scene.enabled = true;
+  for (const start of [.35, .7, 2, 15, 16]) for (const pointer of [{ x: 80, y: 90 }, { x: 1070, y: 690 }, { x: 577, y: 379 }]) {
+    camera.setScroll(123, -87).setZoom(start); camera.preRender();
+    const anchor = camera.getWorldPoint(pointer.x, pointer.y);
+    for (const dy of [-120, -120, 0, 120, 120]) {
+      const previousZoom = camera.zoom; handlers.get('wheel')(pointer, [], 0, dy);
+      camera.preRender(); const after = camera.getWorldPoint(pointer.x, pointer.y);
+      assert.ok(Math.hypot(after.x - anchor.x, after.y - anchor.y) < .001, `${start}: ${dy} lost cursor anchor`);
+      if (!dy) assert.equal(camera.zoom, previousZoom);
+      assert.ok(camera.zoom >= .35 && camera.zoom <= 16);
+    }
+  }
+  // Pan/resize may change camera properties before the next Phaser render updates its matrix.
+  camera.setScroll(-90, 300).setViewport(0, 0, 850, 600).setZoom(1.7); camera.preRender();
+  const expected = camera.getWorldPoint(120, 180); camera.setScroll(-50, 340);
+  handlers.get('wheel')({ x: 120, y: 180 }, [], 0, -120); camera.preRender();
+  const afterPan = camera.getWorldPoint(120, 180); assert.ok(Math.hypot(afterPan.x - expected.x - 40, afterPan.y - expected.y - 40) < .001);
+  scene.enabled = false; const zoom = camera.zoom; handlers.get('wheel')({ x: 120, y: 180 }, [], 0, -120); assert.equal(camera.zoom, zoom);
+});
 
 test('the sword army icon uses the same portrait frame path as ranged units with no sword text overlay', () => {
   const { scene, w } = mapFixture(), frames = [], labels = [];

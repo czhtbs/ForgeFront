@@ -31,6 +31,7 @@ export class GameUI {
   private lineMarkup = "";
   constructor(private scene: MapScene, private start: (settings: Settings) => void) {
     document.querySelector('#app')!.innerHTML = `<header class="topbar"><b>铸造前线</b><span id="network-status" role="status"></span><div id="resources"></div><button data-action="overview">全图</button><button data-action="end">结束本局</button></header><main><section id="map" aria-label="战略地图"><div id="line-tools" hidden></div><div id="toast" role="status"></div><div id="debug" hidden></div></section><aside id="sidebar" hidden aria-label="当前选择"></aside></main><section id="menu" class="veil"></section>`;
+    document.querySelector('#app')!.addEventListener('contextmenu', event => event.preventDefault(), true);
     document.querySelector('#app')!.addEventListener('pointerdown', e => {
       if ((e.target as HTMLElement).closest('button, input, select')) this.controlHeld = true;
     }, true);
