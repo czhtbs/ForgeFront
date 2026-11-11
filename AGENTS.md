@@ -71,7 +71,7 @@
 - 联机以 `docs/planning/联机游戏设计.md` 为实现与验收依据；服务器统一下令，客户端只重放完整指令帧。不得让 UI 绕过命令入口修改联机世界，或让渲染消耗模拟随机数。
 - `src/sim/math.ts` 用于共享模拟数学计算；不得重新用原生三角函数替换而不做跨引擎回放。炮兵快照恢复必须按稳定命令编号重建共享引用，队形扩容不能依赖缓存历史。
 - 正式服务位于 SSH 主机 `aliyun`，入口 `https://czhtbs.ykcryobs.cn/forgefront`，中转站“其他”中紧跟 OpenFront。服务名 `cs-forgefront.service`，运行目录 `/usr/local/lib/cs-forgefront/current`；首次发布备份 `/opt/cs-station-upgrade/forgefront-20261110`。
-- 当前发布为 `44dc780`，规则版本 `e49e0892e005789d`；运行目录、回退位置和验证结果见 `docs/verification/tutorial-release.md`。
+- 当前发布为 `45859a0`，规则版本 `2bdedc91e525a6af`；运行目录、回退位置和验证结果见 `docs/verification/equipment-release.md`。
 - 当前仅单房间、最多六阵营；所有真人断线 60 秒后回收。服务重启会结束内存对局，维护前确认房间无人。沿用站点鉴权与 Unix socket，不新增公网游戏端口。
 - 服务器站点修改仍须先读 `/opt/file_analyzer/AGENTS.md`，保留其他服务与私人数据，Nginx 校验后平滑 reload；站点通过其 `restart.sh reload` 更新。
 

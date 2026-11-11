@@ -1,0 +1,34 @@
+{
+  "commit": "45859a053241bac3b079e30bcdeb630c12cec596",
+  "version": "2bdedc91e525a6af",
+  "archive": "/opt/cs-station-upgrade/forgefront-equipment-20261111-45859a0",
+  "release": "/usr/local/lib/cs-forgefront/releases/20261111-45859a0",
+  "sha256": "35e9604f6b0e18cb7ead51e143c93d4114eadf59963c80a920d0350b707b852a",
+  "script": "assets/index-D2SgRa2S.js",
+  "previous": "/usr/local/lib/cs-forgefront/releases/20261110-44dc780",
+  "before": {
+    "version": "e49e0892e005789d",
+    "tick": 0,
+    "players": 0,
+    "running": false,
+    "resyncs": 0
+  },
+  "linuxReplay": {
+    "version": "2bdedc91e525a6af",
+    "node": "v22.23.4",
+    "platform": "linux",
+    "arch": "x64",
+    "tick": 1200,
+    "hash": "42c8a4ebf8d3210f"
+  },
+  "otherPidsBefore": "MainPID=1175941\nId=file_analyzer.service\n\nMainPID=1012\nId=nginx.service",
+  "after": {
+    "version": "2bdedc91e525a6af",
+    "tick": 0,
+    "players": 0,
+    "running": false,
+    "resyncs": 0
+  },
+  "pid": "2632563",
+  "otherPidsAfter": "MainPID=1175941\nId=file_analyzer.service\n\nMainPID=1012\nId=nginx.service"
+}
