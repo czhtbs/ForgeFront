@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { drawDamageEffects } from '../src/render/damageEffects.ts';
+import { drawDamageEffects, drawSoldierStatus } from '../src/render/damageEffects.ts';
 import { createWorld, soldier } from '../src/sim/world.ts';
 import { addBattle, reinforce, stepBattle } from '../src/sim/combat.ts';
 import { toWorld } from '../src/sim/spatial.ts';
@@ -36,9 +36,9 @@ test('fire stays small and dispersed, and snow drifts inside the circular field'
   const w = world(), field = { kind: 'burn', x: 30, y: 50, radius: 4.5, owner: 0, province: 0, damage: 1, life: 2, pulse: 0 };
   w.fields = [field]; w.time = .6;
   const flames = drawing(w).filter(c => c[0] === 'sprite' && c[1] === 'flame');
-  assert.ok(flames.length >= 6); assert.ok(flames.every(c => c[5] < field.radius * .5));
+  assert.equal(flames.length, 4); assert.ok(flames.every(c => c[5] < field.radius * .25));
   assert.ok(Math.max(...flames.map(c => c[2])) - Math.min(...flames.map(c => c[2])) > field.radius);
-  assert.ok(Math.max(...flames.map(c => c[3])) - Math.min(...flames.map(c => c[3])) > field.radius);
+  assert.ok(Math.max(...flames.map(c => c[3])) - Math.min(...flames.map(c => c[3])) > field.radius * .6);
   field.kind = 'frost'; const before = drawing(w);
   for (const time of [.6, 1, 2]) {
     w.time = time;
@@ -46,6 +46,15 @@ test('fire stays small and dispersed, and snow drifts inside the circular field'
     for (const line of lines) for (const offset of [1, 3]) assert.ok(Math.hypot(line[offset] - field.x, line[offset + 1] - field.y) <= field.radius);
   }
   assert.notDeepEqual(drawing(w), before);
+});
+
+test('overlapping fire fields share a sparse visual layer without altering damage fields or RNG', () => {
+  const w = world(), field = { kind: 'burn', x: 30, y: 50, radius: 10, owner: 0, province: 0, weapon: 'launcher', damage: 10, life: 2 };
+  w.fields = Array.from({ length: 20 }, (_, i) => ({ ...field, x: 30 + i * .1, life: 2 + i * .01 }));
+  const before = structuredClone(w), calls = drawing(w);
+  assert.equal(calls.filter(c => c[0] === 'sprite' && c[1] === 'flame').length, 4); assert.deepEqual(w, before);
+  w.fields.push({ ...field, x: 60 });
+  assert.equal(drawing(w).filter(c => c[0] === 'sprite' && c[1] === 'flame').length, 8);
 });
 
 test('damage particles use local transparent 128px textures and leave other visuals alone', () => {
@@ -57,14 +66,19 @@ test('damage particles use local transparent 128px textures and leave other visu
   assert.deepEqual(drawing(w), []);
 });
 
-test('melee enchantments add distinct hit visuals while retaining single-target damage', () => {
+test('melee effects use the shared area trigger and soldier status art never mutates simulation', () => {
   for (const [effect, kind] of [['blast', 'blast'], ['arc', 'arc'], ['burn', 'flame'], ['frost', 'frost']]) {
     const w = world(), p = w.provinces[0]; p.owner = 1; p.troops = []; p.mobile = [];
     const attacker = { ...soldier(w, 0, 'hilt'), effects: [effect] }, victim = soldier(w, 1), bystander = soldier(w, 1);
     const b = addBattle(w, p.id, [attacker, victim, bystander]); b.reserve.forEach(s => s.deployAt = 0); reinforce(w, b);
     b.fighters.forEach((s, i) => { s.x = 300 + i * 12; s.y = 200; s.position = toWorld(p, s); s.cooldown = i === 0 ? 0 : 100; });
     stepBattle(w, b);
-    assert.equal(b.fighters[1].hp, 100 - 28 * 1.2); assert.equal(b.fighters[2].hp, 100);
-    assert.ok(w.visuals.some(v => v.kind === kind)); assert.equal(w.fields.length, 0);
+    assert.equal(b.fighters[1].hp, 150 - (effect === 'blast' ? 40 : effect === 'arc' ? 30 : 0));
+    assert.equal(b.fighters[2].hp, 200 - (effect === 'blast' ? 40 : effect === 'arc' ? 30 : 0));
+    if (effect === 'blast' || effect === 'arc') assert.ok(w.visuals.some(v => v.kind === kind));
+    else assert.equal(w.fields[0].kind, effect);
+    const s = { ...victim, position: { x: 1, y: 1 }, burning: .8, chill: 80, shocked: .2 };
+    const before = structuredClone(s), calls = [], g = new Proxy({}, { get: (_, name) => (...args) => calls.push([name, ...args]) });
+    drawSoldierStatus(g, s, 1); assert.ok(calls.length > 10); assert.deepEqual(s, before);
   }
 });

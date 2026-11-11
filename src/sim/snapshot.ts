@@ -1,7 +1,7 @@
 import type { ArtilleryOrder, Province, World } from './types.ts';
 import { allTroops } from './world.ts';
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 4;
 export type MapData = Pick<Province, 'id' | 'x' | 'y' | 'name' | 'polygon' | 'neighbors' | 'terrain'>[];
 export const mapData = (w: World): MapData => w.provinces.map(({ id, x, y, name, polygon, neighbors, terrain }) => ({ id, x, y, name, polygon, neighbors, terrain }));
 

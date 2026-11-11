@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import type { Battle, Point, Province, World, Waypoint, Soldier, Route, Fighter } from '../sim/types.ts';
-import { FACTION_COLORS, FORT } from '../sim/types.ts';
+import { FACTION_COLORS, FORT, BUILDING_HP, BUILDING_WORK_SECONDS } from '../sim/types.ts';
 import { distance, inside, randomSource, movementPath, mapBounds } from '../sim/map.ts';
-import { localTroops, configuredItems, marchPath, allTroops, supplyConflict } from '../sim/world.ts';
+import { localTroops, configuredItems, marchPath, allTroops, supplyConflict, buildingWorkPaused } from '../sim/world.ts';
 import { canFight, configuration, unitKey, isWorkshop, EFFECTS, ARTILLERY_MIN, ARTILLERY_MAX } from '../content/equipment.ts';
 import { battleFrame, SOLDIER_SIZE, troopCenter } from '../sim/spatial.ts';
 import { attackTargets } from '../sim/attacks.ts';
@@ -10,7 +10,7 @@ import { orderGesture, boxUnits, commandUnits } from '../ui/interaction.ts';
 import { lineDistance, routeGeometry, editedWaypoints, lineLength, pointAlong, supplyLanes, ROUTE_COLORS, routeNumber, commandRibbon, attackDestination } from './geometry.ts';
 import { buildingWidth, decorations, unitFrame, portraitFrame, swordPose, appear, unitDetail, revealedLine, deathFragments } from './art.ts';
 import { drawTerrain, terrainCanvasSize } from './terrain.ts';
-import { drawDamageEffects, lightning } from './damageEffects.ts';
+import { drawDamageEffects, lightning, drawSoldierStatus } from './damageEffects.ts';
 const vectors = (points: Point[]) => points.map(p => new Phaser.Math.Vector2(p.x, p.y));
 const armyKey = (s: Soldier) => `${unitKey(s)}${s.bombard ? `/artillery:${s.bombard.point.x},${s.bombard.point.y}` : ''}`;
 export interface MapActions { select(id: number): void; selectUnits(ids: number[], additive: boolean, province?: number): void; order(to: number, ids: number[], point?: Point, targets?: number[]): void; connect(from: number, to: number): void; waypoint(route: number, via: Waypoint[]): void; remove(route: number): void }
@@ -63,7 +63,7 @@ export class MapScene extends Phaser.Scene {
     this.load.spritesheet('soldier-debris', 'assets/b-style/soldier-debris.png', { frameWidth: 96, frameHeight: 96 });
     this.load.spritesheet('soldiers', 'assets/b-style/soldiers.png', { frameWidth: 160, frameHeight: 160 });
     this.load.spritesheet('army-portraits', 'assets/b-style/army-portraits.png', { frameWidth: 32, frameHeight: 40 });
-    for (const kind of ['hq', 'barracks', 'workshop', 'mine', 'pine', 'tree', 'mountain']) this.load.image(kind, `assets/b-style/${kind}.png`);
+    for (const kind of ['hq', 'barracks', 'workshop', 'researchLab', 'mine', 'pine', 'tree', 'mountain']) this.load.image(kind, `assets/b-style/${kind}.png`);
     this.load.image('fort', 'assets/b-style/fort.png');
     for (const kind of ['burst', 'flame', 'smoke', 'glow']) this.load.image(`fx-${kind}`, `assets/fx/${kind}.png`);
   }
@@ -260,6 +260,8 @@ export class MapScene extends Phaser.Scene {
       if (!motion) { motion = { soldier: unit, born: this.clock, seen: this.clock }; this.unitMotion.set(unit.id, motion); }
       motion.soldier = { ...unit, position: { ...p } }; motion.seen = this.clock;
       sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setScale(SOLDIER_SIZE / 60).setRotation(angle).setFrame(unitFrame(unit, recoil)).setAlpha(appear(this.clock - motion.born, .28) * unitDetail(camera.zoom));
+      const shade = Math.round(255 * (1 - (unit.burning ?? 0) * .6));
+      sprite.root.setTint(shade * 0x010101); drawSoldierStatus(g, unit, this.world.time);
       this.unitHits.push({ point: p, province, ids: groups.get(`${unit.owner}/${armyKey(unit)}`)!, owner: unit.owner, shipment, radius: SOLDIER_SIZE * .7 });
       if (unit.weapon === 'hilt') {
         const sword = swordPose(unit, recoil);
@@ -397,11 +399,19 @@ export class MapScene extends Phaser.Scene {
       const age = this.clock - ownership.changed;
       if (age < 1.2) { g.lineStyle((1 + age * 3) / z, 0xf5ebc7, 1 - age / 1.2); g.strokePoints(this.polygons[p.id], true); }
       const size = buildingWidth(p), image = this.buildings[p.id];
-      image.setTexture(isWorkshop(p.building) ? 'workshop' : p.building ?? 'fort').setPosition(fort.x, fort.y).setDepth(2 + (fort.y + size * .4) / 10000).setDisplaySize(size, size).clearTint();
-      if (isWorkshop(p.building)) { image.setTint(p.building === 'launcherWorks' ? 0xf5d19b : 0xc5b4ee); this.text({ x: fort.x, y: fort.y + size * .5 }, p.building === 'launcherWorks' ? '发射器' : '配件', '#314e50', 10); }
+      image.setTexture(isWorkshop(p.building) ? 'workshop' : p.building ?? 'fort').setPosition(fort.x, fort.y).setDepth(2 + (fort.y + size * .4) / 10000).setDisplaySize(size, size).setAlpha(p.work?.type === 'build' ? .5 : 1).clearTint();
+      if (p.work) {
+        const y = fort.y + size * .62;
+        g.fillStyle(0x40574d, .7); g.fillRect(fort.x - size / 2, y, size, 3 / z);
+        g.fillStyle(buildingWorkPaused(this.world, p) ? 0xc49b63 : 0x57bca1); g.fillRect(fort.x - size / 2, y, size * p.work.elapsed / BUILDING_WORK_SECONDS, 3 / z);
+      }
+      if (isWorkshop(p.building)) {
+        const style = { launcherWorks: [0xf5d19b, '发射器'], ammoWorks: [0xe8bd9c, '弹药'], attachmentWorks: [0xc5b4ee, '配件'], chipWorks: [0x9bd5cd, '芯片'], armorWorks: [0xb7cadb, '护甲'] } as const;
+        image.setTint(style[p.building][0]); this.text({ x: fort.x, y: fort.y + size * .5 }, style[p.building][1], '#314e50', 10);
+      }
       if (p.hp <= 0) image.setTint(0x777777);
       if (p.id === this.selected || this.world.time - p.lastHit < 2) {
-        const y = fort.y - size * .48; g.fillStyle(0x2c4745, .8); g.fillRect(fort.x - 30 / z, y, 60 / z, 6 / z); g.fillStyle(0x64b38b); g.fillRect(fort.x - 30 / z, y, 60 / z * Math.max(0, p.hp) / 1000, 6 / z);
+        const y = fort.y - size * .48; g.fillStyle(0x2c4745, .8); g.fillRect(fort.x - 30 / z, y, 60 / z, 6 / z); g.fillStyle(0x64b38b); g.fillRect(fort.x - 30 / z, y, 60 / z * Math.max(0, p.hp) / BUILDING_HP, 6 / z);
       }
 
       const groups = new Map<string, Soldier[]>();
@@ -446,7 +456,7 @@ export class MapScene extends Phaser.Scene {
       const soldier = motion.soldier, p = soldier.position!;
       if (!alive.has(id)) { this.unitMotion.delete(id); continue; }
       const alpha = (1 - appear(elapsed, .65)) * detail, sprite = this.unit(unitIndex++);
-      sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setFrame(unitFrame(soldier)).setScale(SOLDIER_SIZE / 60).setAlpha(alpha).setRotation(soldier.angle ?? 0);
+      sprite.root.setVisible(true).setPosition(p.x, p.y).setDepth(2 + p.y / 10000).setFrame(unitFrame(soldier)).setScale(SOLDIER_SIZE / 60).setAlpha(alpha).setRotation(soldier.angle ?? 0).clearTint();
     }
     for (let i = this.iconIndex; i < this.armyIcons.length; i++) this.armyIcons[i].root.setVisible(false);
     for (let i = unitIndex; i < this.units.length; i++) this.units[i].root.setVisible(false);

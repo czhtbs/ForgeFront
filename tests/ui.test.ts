@@ -21,7 +21,7 @@ function uiFixture(startGame = false) {
     set innerHTML(value) { this.markup = value; this.writes++; }
     get innerHTML() { return this.markup; }
   }
-  for (const selector of ['#app','#sidebar','#menu','#resources','#toast','#debug','#line-tools','#tutorial','main']) elements.set(selector,new Element());
+  for (const selector of ['#hover-info','#app','#sidebar','#menu','#resources','#toast','#debug','#line-tools','#tutorial','main']) elements.set(selector,new Element());
   elements.get('#sidebar').hidden = true;
   const document = { activeElement: null, querySelector: selector => elements.get(selector), getElementById: id => elements.get('#' + id) };
   const listeners = new Map(), timers = [];
@@ -47,14 +47,15 @@ test('home separates tutorial, multiplayer, single-player and the 40-tile unlimi
   assert.equal(ui.simulationSpeed, 1);
   w.factions[0].gold = 0;
   const plot = w.provinces.find(p => p.owner === 0 && !p.building); ui.select(plot.id);
-  ui.action('build', 'launcherWorks'); ui.action('upgrade'); ui.render();
-  assert.equal(plot.building, 'launcherWorks'); assert.equal(plot.level, 2); assert.equal(w.factions[0].gold, 0);
+  ui.action('build', 'launcherWorks'); for (let i = 0; i < 120; i++) stepWorld(w);
+  ui.action('upgrade'); for (let i = 0; i < 120; i++) stepWorld(w); ui.render();
+  assert.equal(plot.building, 'launcherWorks'); assert.equal(plot.level, 2); assert.ok(Math.abs(w.factions[0].gold - 32) < 1e-8);
   assert.match(elements.get('#resources').innerHTML, /黄金 <b>∞<\/b>/);
   trainingBattle(w, { weapon: 'launcher', ammo: 'round', effects: ['lob', 'blast'] }, 4);
   stepWorld(w); assert.equal(w.projectiles.length, 4);
 });
 
-test('tutorial teaches mining and paid upgrades before production, capture and accessory assembly', () => {
+test('tutorial teaches four-second construction, Shift splitting, capture, equipment and completed research', () => {
   const { ui, scene, elements } = uiFixture(true); ui.action('tutorial');
   const w = ui.world, guide = ui.tutorial, panel = elements.get('#tutorial');
   const home = w.provinces[w.factions[0].hq], mine = w.provinces[guide.steps[1].province], plot = w.provinces[guide.steps[3].province], target = w.provinces[guide.steps[6].province];
@@ -72,15 +73,18 @@ test('tutorial teaches mining and paid upgrades before production, capture and a
   for (let i = 0; i < 60 && guide.step === 1; i++) { stepWorld(w); ui.render(); }
   assert.equal(guide.step, 2); assert.ok(w.factions[0].gold >= initialGold + 8);
   const beforeUpgrade = w.factions[0].gold; ui.action('upgrade');
-  assert.equal(mine.level, 2); assert.equal(w.factions[0].gold, beforeUpgrade - 100); assert.equal(guide.step, 3);
+  assert.equal(mine.level, 1); assert.equal(w.factions[0].gold, beforeUpgrade - 100); assert.equal(guide.step, 2);
+  for (let i = 0; i < 120; i++) stepWorld(w); ui.render();
+  assert.equal(mine.level, 2); assert.equal(guide.step, 3);
   const upgradedGold = w.factions[0].gold;
   for (let i = 0; i < 30; i++) stepWorld(w);
   assert.ok(Math.abs(w.factions[0].gold - upgradedGold - 5) < 1e-8);
-  ui.select(plot.id); ui.action('build', 'launcherWorks'); assert.equal(guide.step, 4);
+  ui.select(plot.id); ui.action('build', 'launcherWorks'); assert.equal(guide.step, 3);
+  for (let i = 0; i < 120; i++) stepWorld(w); ui.render(); assert.equal(guide.step, 4);
   assert.equal(ui.send({ type: 'connect', from: plot.id, to: home.id }), null); ui.render(); assert.equal(guide.step, 5);
   const advanceTo = step => {
-    assert.equal(ui.simulationSpeed, 8);
-    for (let tick = 0; tick < 30 * 6 && guide.step < step; tick++) {
+    assert.equal(ui.simulationSpeed, guide.step === 7 ? 16 : 8);
+    for (let tick = 0; tick < 30 * 10 && guide.step < step; tick++) {
       for (let n = 0; n < ui.simulationSpeed; n++) stepWorld(w);
       if (tick % 10 === 0) ui.render();
     }
@@ -88,12 +92,23 @@ test('tutorial teaches mining and paid upgrades before production, capture and a
     assert.equal(ui.simulationSpeed, 1);
   };
   advanceTo(6);
-  ui.order(target.id, home.troops.filter(canFight).map(s => s.id)); assert.equal(guide.step, 7);
+  assert.match(panel.innerHTML, /Shift/);
+  const army = home.troops.filter(canFight).map(s => s.id);
+  ui.order(target.id, army.slice(0, Math.ceil(army.length / 2))); assert.equal(guide.step, 7); assert.ok(home.troops.some(canFight));
   advanceTo(8); assert.equal(target.owner, 0);
-  ui.select(target.id); ui.action('build', 'attachmentWorks'); assert.equal(guide.step, 9);
+  ui.select(target.id); ui.action('build', 'ammoWorks'); assert.equal(guide.step, 8);
+  for (let i = 0; i < 120; i++) stepWorld(w); ui.render(); assert.equal(guide.step, 9);
   ui.action('factory-output', 'burn'); assert.equal(guide.step, 10);
   assert.equal(ui.send({ type: 'connect', from: target.id, to: home.id }), null); ui.render(); assert.equal(guide.step, 11);
-  advanceTo(12); assert.match(panel.innerHTML, /完成教程/); assert.equal(scene.tutorialTarget, -1);
+  advanceTo(12); const lab = w.provinces[guide.steps[12].province];
+  ui.select(lab.id); ui.action('build', 'researchLab');
+  for (let i = 0; i < 120; i++) stepWorld(w); ui.render(); assert.equal(guide.step, 13);
+  ui.action('research-tab', 'general'); assert.match(elements.get('#sidebar').innerHTML, /体能训练/);
+  ui.action('research', 'health1'); assert.equal(guide.step, 14);
+  ui.action('cancel-research'); assert.equal(guide.step, 13);
+  ui.action('research', 'health1'); assert.equal(guide.step, 14);
+  advanceTo(15); assert.ok(w.factions[0].research.includes('health1'));
+  assert.match(panel.innerHTML, /完成教程/); assert.equal(scene.tutorialTarget, -1);
   ui.home(); assert.equal(panel.hidden, true); assert.equal(ui.active, false); assert.equal(ui.simulationSpeed, 1);
   ui.action('tutorial'); assert.equal(ui.tutorial.step, 0); assert.equal(ui.world.time, 0);
   ui.action('end'); assert.equal(panel.hidden, true); assert.equal(scene.tutorialTarget, -1);
@@ -154,6 +169,16 @@ test('building buttons survive a timed refresh between press and click and charg
   timers.forEach(fn=>fn());ui.update(performance.now()+3000);assert.equal(world.factions[0].gold,gold-110);
 });
 
+test('construction, demolition and research expose working manual cancel buttons', () => {
+  const { ui, world, p, elements } = uiFixture(), gold = world.factions[0].gold, panel = elements.get('#sidebar');
+  ui.action('build', 'mine'); assert.match(panel.innerHTML, /data-action="cancel-build"/);
+  ui.action('cancel-build'); assert.equal(p.building, null); assert.equal(world.factions[0].gold, gold);
+  p.building = 'researchLab'; ui.render(true); ui.action('research', 'blast1'); assert.match(panel.innerHTML, /data-action="cancel-research"/);
+  ui.action('cancel-research'); assert.equal(p.research, undefined); assert.equal(world.factions[0].gold, gold);
+  ui.action('demolish'); assert.match(panel.innerHTML, /data-action="cancel-demolish"/);
+  ui.action('cancel-demolish'); assert.equal(p.building, 'researchLab'); assert.equal(p.work, undefined); assert.equal(world.factions[0].gold, gold);
+});
+
 test('unchanged panels keep their nodes and selection never resizes the map', () => {
   const { ui, p, elements }=uiFixture(), panel=elements.get('#sidebar'), writes=panel.writes;
   ui.render();ui.render();assert.equal(panel.writes,writes);
@@ -208,12 +233,18 @@ test('barracks sidebar only shows health, troop count and all recruits eligible 
 
 test('construction and production use complete static image cards instead of dropdowns', () => {
   const { ui, world, p, elements } = uiFixture();
-  const expected = { launcherWorks: ['rifle', 'sword'], attachmentWorks: WORKSHOP_ITEMS.attachmentWorks };
+  const expected = WORKSHOP_ITEMS;
   const markup = elements.get('#sidebar').innerHTML;
   for (const kind of Object.keys(WORKSHOP_ITEMS)) assert.ok(markup.includes(`data-id="${kind}"`));
   assert.ok(!markup.includes('data-id="workshop"'));
-  assert.ok(!markup.includes('ammoWorks'));
-  assert.equal([...markup.matchAll(/class="choice-card"/g)].length, 4);
+  assert.ok(markup.includes('researchLab'));
+  assert.doesNotMatch(markup, /assets\/cards\/.*?\.svg/);
+  for (const kind of [...Object.keys(WORKSHOP_ITEMS), 'barracks', 'mine', 'researchLab']) {
+    assert.ok(markup.includes(`assets/buildings/${kind}.webp`));
+    const image = readFileSync(new URL(`../public/assets/buildings/${kind}.webp`, import.meta.url));
+    assert.equal(image.toString('ascii', 0, 4), 'RIFF'); assert.equal(image.toString('ascii', 8, 12), 'WEBP');
+  }
+  assert.equal([...markup.matchAll(/class="choice-card"/g)].length, 8);
   assert.doesNotMatch(markup, /<select/);
   world.settings.training = true;
   for (const kind of Object.keys(WORKSHOP_ITEMS)) {
@@ -245,7 +276,8 @@ test('upgrade is beside the title, disabled without gold, and charges once witho
   elements.get('#app').listeners.get('click')({ target: button }); assert.equal(p.level, 1);
   world.factions[0].gold = 100; ui.render(); assert.doesNotMatch(panel.innerHTML, /data-action="upgrade" disabled/);
   button.disabled = false; elements.get('#app').listeners.get('click')({ target: button });
-  assert.equal(p.level, 2); assert.equal(world.factions[0].gold, 0);
+  assert.equal(p.level, 1); assert.equal(p.work.type, 'upgrade'); assert.equal(world.factions[0].gold, 0);
+  for (let i = 0; i < 120; i++) stepWorld(world); assert.equal(p.level, 2);
   p.level = 5; ui.render(); assert.match(panel.innerHTML, /data-action="upgrade" disabled/);
 });
 
@@ -259,8 +291,10 @@ test('clicking a production card updates output and preserves the scrolled list'
   for (const item of [...Object.values(WORKSHOP_ITEMS).flat(), 'barracks', 'launcherWorks', 'attachmentWorks', 'mine']) {
     const svg = readFileSync(new URL(`../public/assets/cards/${item}.svg`, import.meta.url), 'utf8');
     assert.match(svg, /<svg/); assert.doesNotMatch(svg, /<animate|<script|<text/);
+    if (['rifle', 'sword', 'blast', 'arc', 'burn', 'frost', 'pierce', 'bounce', 'split', 'return', 'homing', 'linger', 'trail', 'delay', 'lob', 'barracks', 'launcherWorks', 'attachmentWorks', 'mine'].includes(item)) {
     const image = readFileSync(new URL(`../docs/art-direction/2026-11-ui-refinement/generated-webp600/${item}.webp`, import.meta.url));
     assert.equal(image.toString('ascii', 0, 4), 'RIFF'); assert.equal(image.toString('ascii', 8, 12), 'WEBP');
+    }
   }
 });
 
@@ -357,7 +391,7 @@ test('damage sprites are reused, culled offscreen and hidden when their effect e
     sprites.push(image); return image;
   } };
   const field = { kind: 'burn', x: 80, y: 80, radius: 4.5, life: 2, pulse: 0, damage: 1, owner: 0, province: 0 };
-  w.fields = [field]; scene.drawAttacks(); const count = sprites.length; assert.equal(count, 10);
+  w.fields = [field]; scene.drawAttacks(); const count = sprites.length; assert.equal(count, 6);
   w.time += .1; scene.drawAttacks(); assert.equal(sprites.length, count);
   field.x = 10000; scene.drawAttacks(); assert.ok(sprites.every(s => !s.visible));
   field.x = 80; scene.drawAttacks(); assert.ok(sprites.every(s => s.visible));

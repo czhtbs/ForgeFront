@@ -10,8 +10,8 @@ const source = new URL('../docs/art-direction/2026-11-game-art/source/', import.
 mkdirSync(output, { recursive: true });
 const save = (name, canvas) => writeFileSync(new URL(name, output), canvas.toBuffer('image/png'));
 const buildingHits = {};
-for (const name of ['hq', 'barracks', 'workshop', 'mine', 'fort', 'pine', 'tree', 'mountain']) {
-  const image = await loadImage(await sharp(readFileSync(new URL(`${name}.png`, source))).png().toBuffer());
+for (const name of ['hq', 'barracks', 'workshop', 'researchLab', 'mine', 'fort', 'pine', 'tree', 'mountain']) {
+  const image = await loadImage(await sharp(readFileSync(name === 'researchLab' ? new URL('../docs/art/research-lab/original.png', import.meta.url) : new URL(`${name}.png`, source))).png().toBuffer());
   const raw = createCanvas(image.width, image.height), c = raw.getContext('2d'); c.drawImage(image, 0, 0);
   const rgba = c.getImageData(0, 0, image.width, image.height).data;
   let minX = image.width, minY = image.height, maxX = 0, maxY = 0;
@@ -20,7 +20,7 @@ for (const name of ['hq', 'barracks', 'workshop', 'mine', 'fort', 'pine', 'tree'
   const sprite = createCanvas(size, size), ctx = sprite.getContext('2d');
   ctx.drawImage(raw, minX, minY, width, height, (size - width * scale) / 2, (size - height * scale) / 2, width * scale, height * scale);
   save(`${name}.png`, sprite);
-  if (['hq', 'barracks', 'workshop', 'mine', 'fort'].includes(name)) {
+  if (['hq', 'barracks', 'workshop', 'researchLab', 'mine', 'fort'].includes(name)) {
     const pixels = ctx.getImageData(0, 0, size, size).data, points = [];
     for (let y = 32; y <= 224; y += 24) for (let x = 32; x <= 224; x += 24) if (pixels[(y * size + x) * 4 + 3] > 220) points.push([x / size - .5, y / size - .5]);
     buildingHits[name] = points;

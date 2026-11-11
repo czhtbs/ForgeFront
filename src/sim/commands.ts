@@ -1,13 +1,22 @@
 import { WORKSHOP_ITEMS, canFight } from '../content/equipment.ts';
 import type { Item } from '../content/equipment.ts';
 import type { Building, Point, Waypoint, World } from './types.ts';
-import { allTroops, build, connect, disconnect, orderUnits, reroute, setFactoryOutput, surrender, upgrade } from './world.ts';
+import { allTroops, build, connect, disconnect, orderUnits, reroute, setFactoryOutput, surrender, upgrade, demolish, cancelUpgrade, cancelBuildingWork } from './world.ts';
 import { inside } from './map.ts';
+import { TECH } from '../content/research.ts';
+import type { ResearchBranch } from '../content/research.ts';
+import { startResearch, setTrialResearch, cancelResearch } from './research.ts';
+import { BUILDING_COST } from './types.ts';
 
 export type Command =
   | { type: 'build'; province: number; building: Exclude<Building, null | 'hq'> }
   | { type: 'upgrade'; province: number }
+  | { type: 'demolish'; province: number }
+  | { type: 'cancelUpgrade'; province: number }
+  | { type: 'cancelBuild' | 'cancelDemolish' | 'cancelResearch'; province: number }
   | { type: 'output'; province: number; item: Item }
+  | { type: 'research'; province: number; technology: string }
+  | { type: 'trialResearch'; branch: ResearchBranch; level: number }
   | { type: 'connect'; from: number; to: number }
   | { type: 'disconnect'; route: number }
   | { type: 'reroute'; route: number; via: Waypoint[] }
@@ -26,7 +35,14 @@ export function normalizeCommand(w: World, owner: number, value: unknown): Comma
   const point = (p: any) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
   const ids = (v: unknown): v is number[] => Array.isArray(v) && v.length <= 20000 && v.every(Number.isSafeInteger);
   switch (c.type) {
-    case 'build': return owned(c.province) && ['barracks', 'launcherWorks', 'attachmentWorks', 'mine'].includes(c.building) ? { type: c.type, province: c.province, building: c.building } : null;
+    case 'build': return owned(c.province) && Object.hasOwn(BUILDING_COST, c.building) ? { type: c.type, province: c.province, building: c.building } : null;
+    case 'research': return owned(c.province) && typeof c.technology === 'string' && Object.hasOwn(TECH, c.technology) ? { type: c.type, province: c.province, technology: c.technology } : null;
+    case 'trialResearch': return w.settings.training && !w.settings.multiplayer && ['blast', 'burn', 'frost', 'arc', 'health', 'haste', 'mobility'].includes(c.branch) && Number.isInteger(c.level) && c.level >= 0 && c.level <= 3 ? { type: c.type, branch: c.branch, level: c.level } : null;
+    case 'demolish':
+    case 'cancelUpgrade':
+    case 'cancelBuild':
+    case 'cancelDemolish':
+    case 'cancelResearch':
     case 'upgrade': return owned(c.province) ? { type: c.type, province: c.province } : null;
     case 'output': return owned(c.province) && Object.values(WORKSHOP_ITEMS).some(items => items.includes(c.item)) ? { type: c.type, province: c.province, item: c.item } : null;
     case 'connect': return owned(c.from) && owned(c.to) && c.from !== c.to ? { type: c.type, from: c.from, to: c.to } : null;
@@ -48,7 +64,14 @@ export function executeCommand(w: World, owner: number, c: Command): string | nu
   switch (c.type) {
     case 'build': return build(w, c.province, c.building, owner);
     case 'upgrade': return upgrade(w, c.province, owner);
+    case 'demolish': return demolish(w, c.province, owner);
+    case 'cancelUpgrade': return cancelUpgrade(w, c.province, owner);
+    case 'cancelBuild': return cancelBuildingWork(w, c.province, 'build', owner);
+    case 'cancelDemolish': return cancelBuildingWork(w, c.province, 'demolish', owner);
+    case 'cancelResearch': return cancelResearch(w, c.province, owner);
     case 'output': return setFactoryOutput(w, c.province, c.item, owner);
+    case 'research': return startResearch(w, c.province, c.technology, owner);
+    case 'trialResearch': return setTrialResearch(w, owner, c.branch, c.level);
     case 'connect': return connect(w, c.from, c.to, owner);
     case 'disconnect': disconnect(w, c.route, owner); return null;
     case 'reroute': return reroute(w, c.route, c.via, owner);

@@ -74,7 +74,7 @@ test('training battle uses real combat with requested composition', () => {
   advance(w, 8); const b = w.battles[0]; assert.ok(b); assert.equal(b.fighters.length + b.reserve.length + b.losses.reduce((a, b) => a + b, 0), 80); assert.ok(b.fighters.some(s => s.weapon === 'launcher'));
 });
 test('retreat conserves survivors and moves them back through transit', () => {
-  const w = quiet(), home = w.provinces[w.factions[0].hq], target = home.neighbors.find(n => w.provinces[n].owner === -1)!;
+  const w = quiet(), home = w.provinces[w.factions[0].hq], target = home.neighbors[0]; w.provinces[target].owner = -1;
   const troops = home.troops.splice(0, 20); const b = addBattle(w, target, troops); reinforce(w, b);
   const before = totalTroops(w, 0); assert.equal(retreat(w, target, home.id), null);
   assert.equal(totalTroops(w, 0), before); assert.equal(b.fighters.filter(s => s.owner === 0).length, 0);
@@ -120,7 +120,7 @@ test('fort capture changes ownership while surviving enemy guards remain enemies
   const w = quiet(), p = w.provinces.find(p => p.owner === -1)!; p.owner = 1;
   p.troops = [soldier(w, 1)]; const b = addBattle(w, p.id, [soldier(w, 0)]); reinforce(w, b);
   p.hp = 1; fortShot(w, b, 0); stepWorld(w);
-  assert.equal(p.owner, 0); assert.equal(p.hp, 1000); assert.ok(w.battles.includes(b)); assert.ok(b.fighters.some(f => f.owner === 1)); assert.equal(b.models,false);
+  assert.equal(p.owner, 0); assert.equal(p.hp, 3000); assert.ok(w.battles.includes(b)); assert.ok(b.fighters.some(f => f.owner === 1)); assert.equal(b.models,false);
 });
 test('movement reroutes around hostile land and stops if every route is blocked', () => {
   const w = quiet(); w.provinces.forEach((p, i) => { p.neighbors = []; p.owner = -1; p.building = null; p.troops = []; });
@@ -144,7 +144,7 @@ test('a ranged soldier keeps a fort under attack between shots', () => {
   const w = quiet(), p = w.provinces.find(p => p.owner === -1)!;
   const b = addBattle(w, p.id, [soldier(w, 0, 'launcher')]); reinforce(w, b);
   b.fighters[0].x = FORT.x - 230; b.fighters[0].y = FORT.y;
-  advance(w, 15); assert.ok(p.hp < 850); assert.equal(p.owner, -1);
+  advance(w, 15); assert.ok(p.hp < 2500); assert.equal(p.owner, -1);
 });
 
 test('marches and battlefield locomotion share one world-space speed', () => {
@@ -239,7 +239,7 @@ test('new recruits walk from the barracks while existing queue positions remain 
 });
 
 test('marches expand into a staged battle at the entry and preserve deployed positions on retreat', () => {
-  const w=quiet(),home=w.provinces[w.factions[0].hq], target=home.neighbors.find(id=>w.provinces[id].owner===-1)!;
+  const w=quiet(),home=w.provinces[w.factions[0].hq], target=home.neighbors[0]; w.provinces[target].owner=-1;
   const chosen=home.troops.slice(0,12), ids=new Set(chosen.map(s=>s.id)), positions=new Map(chosen.map(s=>[s.id,{...s.position}]));
   dispatch(w,home.id,target,12,0,undefined,ids);
   for(const unit of w.shipments[0].troops) assert.deepEqual(unit.position,positions.get(unit.id));
@@ -267,7 +267,7 @@ test('two armies entering neutral territory fight each other before targeting it
   a.position=toWorld(p,{x:300,y:100});b.position=toWorld(p,{x:600,y:100});
   const battle=addBattle(w,p.id,[a]);addBattle(w,p.id,[b]);stepWorld(w);
   const first=battle.fighters.find(f=>f.id===a.id)!,second=battle.fighters.find(f=>f.id===b.id)!;
-  assert.equal(first.target,b.id);assert.equal(second.target,a.id);assert.equal(p.hp,1000);assert.equal(p.owner,-1);
+  assert.equal(first.target,b.id);assert.equal(second.target,a.id);assert.equal(p.hp,3000);assert.equal(p.owner,-1);
 });
 
 test('later opponents receive active slots without teleporting either side or bypassing combat', () => {
@@ -295,7 +295,7 @@ test('opposing marches crossing a neutral border on the same tick join one battl
   stepWorld(w);assert.equal(w.shipments.length,0);
   const battle=w.battles.find(b=>b.province===p.id)!;assert.equal(battle.fighters.length,2);
   assert.ok(battle.fighters.every(f=>f.target===battle.fighters.find(other=>other.owner!==f.owner)!.id));
-  assert.equal(p.owner,-1);assert.equal(p.hp,1000);
+  assert.equal(p.owner,-1);assert.equal(p.hp,3000);
 });
 
 
@@ -322,7 +322,7 @@ test('each faction deploys one soldier every 0.2 seconds and reserves do not fir
   assert.ok([...b.fighters,...b.reserve].every(s=>inside(s.position!,p.polygon)));
   const enemy=soldier(w,1);addBattle(w,p.id,[enemy]);enemy.deployAt=w.tick+60;
   b.fighters.forEach(f=>{f.cooldown=0;f.x=FORT.x-100;f.y=FORT.y;});
-  const before=b.shots;stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(b.shots,before);assert.equal(p.hp,1000);
+  const before=b.shots;stepBattle(w,b);stepAttacks(w);resolveDeaths(w);assert.equal(b.shots,before);assert.equal(p.hp,3000);
 });
 
 

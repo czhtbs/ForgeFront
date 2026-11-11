@@ -13,3 +13,5 @@
 | `npm run probe` | 运行模拟性能检查 |
 
 运行 `npm run build` 后，`npm run server` 也会在 http://127.0.0.1:5182/ 提供生产页面。
+
+当前本地版本的装备、护甲、战术芯片与研究室升级见 [设计与验收](docs/verification/equipment-upgrade/README.md)。

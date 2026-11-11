@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Point, World } from '../sim/types.ts';
+import type { Point, World, Soldier } from '../sim/types.ts';
 
 type Graphics = Pick<Phaser.GameObjects.Graphics, 'fillStyle' | 'lineStyle' | 'fillCircle' | 'strokeCircle' | 'fillTriangle' | 'beginPath' | 'moveTo' | 'lineTo' | 'closePath' | 'fillPath' | 'lineBetween'>;
 export type EffectStamp = (texture: string, x: number, y: number, width: number, height: number, tint: number, alpha: number, angle?: number) => void;
@@ -39,10 +39,10 @@ function snow(g: Graphics, x: number, y: number, radius: number, time: number, a
 }
 function fire(g: Graphics, stamp: EffectStamp, x: number, y: number, radius: number, time: number, alpha: number) {
   stamp('glow', x, y, radius * 2, radius * 2, 0xf38c25, alpha * .14);
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 4; i++) {
     const seed = noise(x * 3 + y + i * 7), phase = time * (2 + seed) + seed * 8, angle = i * 2.399 + noise(x + y) * 6.28;
-    const reach = radius * .76 * Math.sqrt((i + .5) / 8), px = x + Math.cos(angle) * reach, base = y + Math.sin(angle) * reach;
-    const tip = radius * (.3 + .08 * Math.sin(phase * 3)), width = radius * .1, lean = Math.sin(phase * 2) * width;
+    const reach = radius * .76 * Math.sqrt((i + .5) / 4), px = x + Math.cos(angle) * reach, base = y + Math.sin(angle) * reach;
+    const tip = radius * (.15 + .04 * Math.sin(phase * 3)), width = radius * .05, lean = Math.sin(phase * 2) * width;
     stamp('flame', px, base - tip * .45, width * 3, tip * 1.3, 0xffa031, alpha * .7, Math.sin(phase) * .12);
     g.fillStyle(0xf87922, alpha * .75); g.beginPath(); g.moveTo(px - width, base);
     g.lineTo(px - width * 1.1, base - tip * .35); g.lineTo(px - width * .3, base - tip * .65); g.lineTo(px + lean, base - tip);
@@ -72,13 +72,13 @@ function explosion(g: Graphics, stamp: EffectStamp, x: number, y: number, progre
 }
 
 export function drawDamageEffects(w: World, g: Graphics, stamp: EffectStamp) {
+  const fires = w.fields.filter(f => f.kind === 'burn').sort((a, b) => b.life - a.life), drawn: typeof fires = [];
+  for (const f of fires) {
+    if (drawn.some(other => Math.hypot(f.x - other.x, f.y - other.y) < Math.min(f.radius, other.radius) * .75)) continue;
+    drawn.push(f); fire(g, stamp, f.x, f.y, f.radius, w.time, fade(f.life, .4));
+  }
   for (const f of w.fields) {
-    const alpha = fade(f.life, .4), phase = w.time * 3 + f.x + f.y;
-    if (f.kind === 'burn') fire(g, stamp, f.x, f.y, f.radius, w.time, alpha);
-    else if (f.kind === 'frost') snow(g, f.x, f.y, f.radius, w.time, alpha);
-    else if (f.kind === 'arc') {
-      for (let i = 0; i < 3; i++) { const angle = i * 2.1 + Math.sin(phase); lightning(g, f, { x: f.x + Math.cos(angle) * f.radius, y: f.y + Math.sin(angle) * f.radius }, Math.floor(w.time * 18), alpha); }
-    } else explosion(g, stamp, f.x, f.y, 1 - fade(f.life, .4), alpha, f.radius);
+    if (f.kind === 'frost') snow(g, f.x, f.y, f.radius, w.time, fade(f.life, .4));
   }
   for (const v of w.visuals) {
     const alpha = fade(v.life, v.max), progress = 1 - alpha;
@@ -86,5 +86,27 @@ export function drawDamageEffects(w: World, g: Graphics, stamp: EffectStamp) {
     else if (v.kind === 'arc') { lightning(g, v, v.target!, Math.floor(progress * 6), alpha); stamp('glow', v.target!.x, v.target!.y, 4, 4, 0xb9a0ff, alpha * .65); }
     else if (v.kind === 'flame') fire(g, stamp, v.x, v.y, 2, w.time, alpha);
     else if (v.kind === 'frost') snow(g, v.x, v.y, 2.5, w.time, alpha);
+  }
+}
+
+export function drawSoldierStatus(g: Graphics, s: Soldier, time: number) {
+  const p = s.position!;
+  if (s.burning! > 0) {
+    for (let i = 0; i < 3; i++) {
+      const x = p.x + (i - 1) * .65, height = 1.5 + Math.sin(time * 13 + i * 2 + s.id) * .45;
+      g.fillStyle(0xe87932, .85); g.fillTriangle(x - .5, p.y + .5, x + .5, p.y + .5, x + Math.sin(time * 8 + i) * .3, p.y - height);
+      g.fillStyle(0xffd47b, .9); g.fillTriangle(x - .2, p.y + .5, x + .2, p.y + .5, x, p.y - height * .55);
+    }
+  }
+  if (s.chill! > 0 || s.frozen! > 0) {
+    const cover = s.frozen! > 0 ? 1 : s.chill! / 100;
+    g.fillStyle(0x9cdae8, .15 + cover * .45);
+    g.fillTriangle(p.x - 1.5, p.y + 1.3, p.x + 1.5, p.y + 1.3, p.x - .5, p.y - 1.7 * cover);
+    g.fillTriangle(p.x + 1.5, p.y + 1.3, p.x + 1, p.y - 1.8 * cover, p.x - .5, p.y - 1.7 * cover);
+    g.lineStyle(.16, 0xe7fbff, .5 + cover * .5); g.lineBetween(p.x - 1.5, p.y + 1.3, p.x - .5, p.y - 1.7 * cover); g.lineBetween(p.x - .5, p.y - 1.7 * cover, p.x + 1, p.y - 1.8 * cover);
+  }
+  if (s.shocked! > 0) {
+    lightning(g, { x: p.x - 1.5, y: p.y - 1 }, { x: p.x + 1.5, y: p.y + 1 }, Math.floor(time * 20) + s.id, Math.min(1, s.shocked! * 6));
+    g.lineStyle(.2, 0xd9c9ff, .8); g.strokeCircle(p.x, p.y, 1.7);
   }
 }

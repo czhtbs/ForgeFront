@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canFight } from '../src/content/equipment.ts';
+import { canFight, workshopFor } from '../src/content/equipment.ts';
 import { createWorld, soldier, stepWorld, connect, disconnect, reroute, configuredItems, productionState, setFactoryOutput, allTroops, localTroops, dispatch } from '../src/sim/world.ts';
 import { supplyLanes, routeGeometry } from '../src/render/geometry.ts';
 
@@ -17,7 +17,7 @@ function home(w, id, count = 0) {
   return p;
 }
 function factory(w, id, item) {
-  const p = w.provinces[id]; p.building = ['rifle', 'sword', 'sword'].includes(item) ? 'launcherWorks' : 'attachmentWorks'; p.output = item; p.level = 4;
+  const p = w.provinces[id]; p.building = workshopFor(item); p.output = item; p.level = 4;
   return p;
 }
 const link = (w, from, to) => { assert.equal(connect(w, from, to), null); return w.routes.at(-1)!; };
@@ -41,7 +41,7 @@ test('relay stops local assembly and forwards all incoming equipment along the s
   assert.ok(arrivals.find(s => s.id === ids[0])!.effects.includes('pierce'));
   assert.ok(a.troops.includes(armed)); assert.deepEqual(armed.effects, []);
   assert.equal(productionState(w, b.id).inputs.rifle, 1);
-  assert.equal(productionState(w, b.id).inputs.burn, 1);
+  assert.equal(productionState(w, b.id).inputs.burn, 4 / 6);
   assert.equal(w.routes.length, 3);
   assert.equal(supplyLanes(w, a.id, 1).filter(l => l.r.from === a.id && l.r.to === b.id).length, 1);
   assert.equal(new Set(allTroops(w).map(s => s.id)).size, allTroops(w).length);
@@ -77,7 +77,7 @@ test('multi-hop splitting conserves supply rates and rejects cycles and downstre
   advance(w, 90);
   for (const id of [4, 5]) {
     const state = productionState(w, id);
-    assert.equal(state.inputs.rifle, .5); assert.equal(state.inputs.burn, .5);
+    assert.equal(state.inputs.rifle, .5); assert.equal(state.inputs.burn, 2 / 6);
   }
   assert.ok(localTroops(w, 5).some(canFight));
 });

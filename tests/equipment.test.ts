@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LAUNCHERS, REMOTE_ONLY, canFight, configuration, isWorkshop } from '../src/content/equipment.ts';
+import { LAUNCHERS, REMOTE_ONLY, canFight, configuration, isWorkshop, workshopFor } from '../src/content/equipment.ts';
 import { build, connect, createWorld, dispatch, localTroops, productionState, setFactoryOutput, soldier, stepWorld } from '../src/sim/world.ts';
 import { runAI } from '../src/ai/strategy.ts';
 import { stepLocalWorld } from '../src/sim/lockstep.ts';
@@ -16,7 +16,7 @@ function factoryWorld() {
   return { w, home, unit };
 }
 function supply(w, id, item) {
-  const kind = item in LAUNCHERS ? 'launcherWorks' : 'attachmentWorks';
+  const kind = workshopFor(item);
   assert.equal(build(w, id, kind), null);
   assert.equal(setFactoryOutput(w, id, item), null);
   assert.equal(connect(w, id, 0), null);
@@ -26,7 +26,7 @@ function supply(w, id, item) {
 test('each workshop is a separate building with category-restricted output and no recruits', () => {
   const { w } = factoryWorld(); const before = w.factions[0].gold;
   for (const [id, item] of [[1, 'sword'], [2, 'blast']]) supply(w, id, item);
-  assert.equal(w.factions[0].gold, before - 220);
+  assert.equal(w.factions[0].gold, before - 250);
   assert.ok(setFactoryOutput(w, 1, 'pierce')); assert.ok(setFactoryOutput(w, 2, 'rifle'));
   assert.deepEqual(w.provinces.slice(1, 3).map(p => p.output), ['sword', 'blast']);
   advance(w, 30);
@@ -74,7 +74,7 @@ test('assembly at capacity keeps partial configurations and does not bank unused
   advance(w, 45);
   assert.ok(home.troops.some(s => canFight(s) && s.effects.length === 0));
   assert.ok(home.troops.some(s => canFight(s) && s.effects.length === 2));
-  advance(w, 230);
+  advance(w, 500);
   assert.deepEqual(home.troops.map(s => s.id), ids);
   assert.ok(home.troops.every(s => canFight(s) && s.effects.length === 2));
   assert.equal(productionState(w, 0).rate, 0);
@@ -84,16 +84,18 @@ test('assembly at capacity keeps partial configurations and does not bank unused
 test('loadout conflicts reject changes while new ranged combinations and melee enchantments work', () => {
   for (const items of [['rifle', 'sword']]) assert.ok(configuration(items).error);
   for (const effect of REMOTE_ONLY) assert.ok(configuration(['sword', effect]).error, effect);
-  assert.equal(configuration(['sword', 'blast', 'arc', 'burn', 'frost', 'pierce']).error, null);
-  assert.equal(configuration(['rifle', 'pierce', 'split', 'burn', 'blast']).error, null);
+  for (const effect of ['blast', 'arc', 'burn', 'frost']) assert.equal(configuration(['sword', effect, 'pierce']).error, null);
+  assert.ok(configuration(['sword', 'blast', 'arc']).error);
+  assert.equal(configuration(['rifle', 'pierce', 'split', 'burn']).error, null);
+  assert.ok(configuration(['rifle', 'burn', 'blast']).error);
   assert.ok(configuration(['sword', 'lob']).error);
-  const { w } = factoryWorld(); supply(w, 1, 'rifle'); supply(w, 2, 'lob');
+  const { w } = factoryWorld(); w.factions[0].research.push('lob'); supply(w, 1, 'rifle'); supply(w, 2, 'lob');
   assert.ok(setFactoryOutput(w, 1, 'sword')); assert.equal(w.provinces[1].output, 'rifle');
   assert.equal(build(w, 3, 'launcherWorks'), null); setFactoryOutput(w, 3, 'sword');
   assert.ok(connect(w, 3, 0)); assert.equal(w.routes.length, 2);
 });
 
-test('starting armies are armed and AI supplies weapons and attachments without ammunition factories', () => {
+test('starting armies are armed and AI supplies weapons and attachments through category-specific factories', () => {
   const w = createWorld({ seed: 4521, count: 40, enemies: 1, difficulty: 'normal' });
   assert.ok(w.provinces[w.factions[0].hq].troops.every(s => canFight(s) && s.weapon && s.ammo));
   for (let i = 0; i < 80 * 30; i++) stepLocalWorld(w);

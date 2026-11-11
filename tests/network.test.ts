@@ -25,9 +25,9 @@ test('two seats execute each command once and reject control of another faction'
   room.request(members[0], 1, { type: 'upgrade', province: p.id });
   room.request(members[1], 1, { type: 'upgrade', province: p.id });
   tick();
-  assert.equal(p.level, 2); assert.ok(room.world.factions[0].gold < initial - 99);
+  assert.equal(p.level, 1); assert.equal(p.work.type, 'upgrade'); assert.ok(room.world.factions[0].gold < initial - 99);
   room.request(members[0], 1, { type: 'upgrade', province: p.id });
-  assert.equal(messages[0].at(-1).seq, 1); tick(); assert.equal(p.level, 2);
+  assert.equal(messages[0].at(-1).seq, 1); tick(); for (let i = 0; i < 118; i++) tick(); assert.equal(p.level, 2);
   for (const r of replicas) assert.equal(hashState(r.world), hashState(room.world));
   assert.equal(members[1].processed, 1); assert.ok(members[1].results.get(1).error);
 });
@@ -54,7 +54,7 @@ test('an unacknowledged command resubmitted on reconnect cannot buy an upgrade t
   room.request(m, 1, command); room.disconnect(m, m.send); tick();
   const restored = room.join('test-0', m.token, () => {}, () => {});
   assert.equal(room.recovery(restored).processed, 1);
-  room.request(restored, 1, command); tick(); assert.equal(room.world.provinces[province].level, 2);
+  room.request(restored, 1, command); for (let i = 0; i < 119; i++) tick(); assert.equal(room.world.provinces[province].level, 2);
 });
 
 test('buffer does not skip missing ticks, slow replicas do not stop other players, final frames drain', () => {
@@ -114,7 +114,7 @@ test('the production browser client submits, corrects corruption and reconnects 
   assert.equal(a.command({ type: 'upgrade', province }), null); await wait(() => game.room.pending.length === 1);
   for (let i = 0; i < 60; i++) game.room.tick();
   await wait(() => b.replica.frames.length === 60); a.update(2); b.update(2);
-  assert.equal(a.replica.world.provinces[province].level, 2);
+  assert.equal(a.replica.world.provinces[province].level, 1); assert.equal(a.replica.world.provinces[province].work.type, 'upgrade');
   a.replica.world.factions[0].gold += 77;
   for (let i = 0; i < 30; i++) game.room.tick();
   await wait(() => a.replica.frames.at(-1)?.tick === 90); a.update(1); b.update(1);

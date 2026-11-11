@@ -11,11 +11,11 @@ const { chromium, firefox } = createRequire(import.meta.url)('playwright');
 const w = createWorld({ seed: 4521, count: 80, enemies: 5, difficulty: 'hard', multiplayer: true });
 w.factions.forEach(f => f.ai = true);
 const effects = ['blast', 'arc', 'burn', 'frost', 'pierce', 'homing', 'split', 'linger', 'return', 'delay', 'bounce'];
-for (const p of w.provinces) p.troops.forEach((s, i) => { s.effects = [effects[i % effects.length]]; if (i < 8) s.effects.push('lob'); if (i >= 30) { s.weapon = 'hilt'; s.ammo = 'blade'; } });
+for (const p of w.provinces) p.troops.forEach((s, i) => { s.effects = [effects[i % effects.length]]; if (s.effects.includes('delay')) s.effects.push('blast'); if (i < 8) s.effects.push('lob'); if (i >= 30) { s.weapon = 'hilt'; s.ammo = 'blade'; s.hp = 400; s.effects = [effects[i % 4], 'pierce']; } });
 const initial = encodeState(w), map = mapData(w), frames = [], states = new Map(), samples = [];
 for (let i = 0; i < 3600 && w.winner === null; i++) {
   const commands = i === 0 ? w.factions.map(f => {
-    const p = w.provinces[f.hq], target = p.neighbors.find(n => w.provinces[n].owner !== f.id);
+    const p = w.provinces[f.hq], target = w.provinces.find(q => q.owner !== f.id && q.neighbors.some(id => w.provinces[id].owner === f.id)).id;
     return { player: f.id, seq: 0, command: { type: 'armyOrder', units: p.troops.map(s => s.id), province: target } };
   }) : [];
   const { frame } = advanceAuthority(w, commands); frames.push(frame);

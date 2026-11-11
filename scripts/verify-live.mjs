@@ -18,7 +18,7 @@ try {
     assert.match(index.headers.get('content-security-policy'), /frame-ancestors 'self'/);
     const html = await index.text(), script = html.match(/src="([^"]+\.js)"/)[1];
     const js = await fetch(new URL(script, origin + '/forgefront/play/'), { headers: { Cookie: cookie } }); assert.equal(js.status, 200); assert.ok((await js.text()).includes(simulationVersion()));
-    for (const file of ['assets/cards/barracks.svg', 'assets/cards/rifle.svg', 'assets/cards/sword.svg', 'assets/b-style/soldiers.png', 'assets/fx/flame.png']) {
+    for (const file of ['assets/buildings/barracks.webp', 'assets/buildings/researchLab.webp', 'assets/b-style/researchLab.png', 'assets/cards/rifle.svg', 'assets/cards/sword.svg', 'assets/b-style/soldiers.png', 'assets/fx/flame.png']) {
       const asset = await fetch(origin + '/forgefront/play/' + file, { headers: { Cookie: cookie } }); assert.equal(asset.status, 200); assert.ok((await asset.arrayBuffer()).byteLength > 100);
     }
     const replica = new Replica(), messages = [], socket = new WebSocket(endpoint, { origin, headers: { Cookie: cookie } });
@@ -35,14 +35,14 @@ try {
     await wait(() => messages.some(m => m.type === 'lobby' || m.type === 'error'));
     assert.ok(!messages.some(m => m.type === 'error'));
     if (i === 0) assert.equal(messages.find(m => m.type === 'lobby').lobby.players.length, 1, 'Room occupied; stop without starting a test match');
-    checks.push('guest identity, station navigation, protected HTML, current JS, SVG cards, sprites and WSS');
+    checks.push('guest identity, station navigation, protected HTML, current JS, generated building cards, equipment icons, sprites and WSS');
   }
   const [a, b] = clients;
   a.socket.send(JSON.stringify({ type: 'configure', ai: 0, settings: { seed: 4521, count: 40, difficulty: 'normal' } }));
   await wait(() => a.messages.some(m => m.type === 'lobby' && m.lobby.ai === 0 && m.lobby.players.length === 2));
   a.socket.send(JSON.stringify({ type: 'start' })); await wait(() => clients.every(c => c.replica.world));
   a.socket.send(JSON.stringify({ type: 'command', seq: 1, command: { type: 'upgrade', province: a.replica.world.factions[0].hq } }));
-  await wait(() => clients.every(c => c.replica.world.tick >= 90));
+  await wait(() => clients.every(c => c.replica.world.tick >= 150));
   assert.ok(clients.every(c => c.replica.world.provinces[c.replica.world.factions[0].hq].level === 2));
   a.socket.send(JSON.stringify({ type: 'command', seq: 2, command: { type: 'surrender' } }));
   await wait(() => clients.every(c => c.replica.world.winner === 1));

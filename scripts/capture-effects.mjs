@@ -76,7 +76,7 @@ const plans = {
   trail: { effects: ['trail', 'burn'], targets: [[15, 0]], times: [.25, .5, .72] },
   delay: { effects: ['delay', 'blast'], times: [.3, .65, 1.7] },
   lob: { effects: ['lob', 'blast'], targets: [[70, 0]], times: [.37, .77, 1.37], zoom: 3.3 },
-  all: { effects: Object.keys(EFFECTS), targets: [[70, 0], [74, 6], [80, -5]], times: [.7, 1.5, 4.1], zoom: 3 },
+  all: { effects: Object.keys(EFFECTS).filter(e => !['arc', 'burn', 'frost'].includes(e)), targets: [[70, 0], [74, 6], [80, -5]], times: [.7, 1.5, 4.1], zoom: 3 },
 };
 const captured = new Map(), manifest = [];
 for (const [key, plan] of Object.entries(plans)) {
@@ -98,7 +98,7 @@ for (const [key, plan] of Object.entries(plans)) {
     const frame = snapshot(w, p.troops, center, plan.zoom ?? 7), context = frame.getContext('2d');
     context.setTransform(1, 0, 0, 1, 0, 0); context.globalAlpha = 1;
     context.fillStyle = '#f7f8ef'; context.fillRect(8, 8, 205, 25); context.fillStyle = '#254b4e'; context.font = '14px Microsoft YaHei';
-    context.fillText(`${key === 'all' ? '全部配件' : itemName(key)} · ${w.time.toFixed(2)} s`, 16, 26);
+    context.fillText(`${key === 'all' ? '炸药与全部配件' : itemName(key)} · ${w.time.toFixed(2)} s`, 16, 26);
     animation.push(Buffer.from(context.getImageData(0, 0, 400, 230).data));
     if (tick === Math.ceil(plan.times[frames.length] * 30)) {
       assert.ok(w.projectiles.length || w.fields.length || w.visuals.length, `${key}: no visible effect at ${w.time}`);
@@ -121,7 +121,7 @@ function sheet(keys, title, filename) {
   c.font = '14px Microsoft YaHei'; c.fillStyle = '#65796c'; c.fillText('现有战斗逻辑与 MapScene 绘制 · 独立演示场景 · 按时间从左向右', 24, 65);
   keys.forEach((key, row) => {
     const y = 90 + row * 290, plan = plans[key]; c.font = 'bold 18px Microsoft YaHei'; c.fillStyle = '#254b4e';
-    c.fillText(key === 'all' ? '13 种配件全部安装' : itemName(key) + (key === 'trail' ? ' + 燃烧剂' : ['delay', 'lob'].includes(key) ? ' + 炸药' : ''), 24, y + 17);
+    c.fillText(key === 'all' ? '炸药与全部武器配件' : itemName(key) + (key === 'trail' ? ' + 燃烧剂' : ['delay', 'lob'].includes(key) ? ' + 炸药' : ''), 24, y + 17);
     captured.get(key).forEach((frame, i) => c.drawImage(frame, 16 + i * 408, y + 30));
   });
   writeFileSync(new URL(filename, output), canvas.toBuffer('image/png'));
@@ -131,8 +131,8 @@ sheet(['rifle'], '步枪 · 当前战场表现', 'effects-weapons.png');
 sheet(['pierce', 'bounce', 'split', 'return', 'homing'], '弹道配件 · 当前战场表现', 'effects-trajectories.png');
 sheet(['linger', 'trail', 'delay', 'lob', 'all'], '时序配件与全配件组合 · 当前战场表现', 'effects-timing.png');
 writeFileSync(new URL('effects-manifest.json', output), JSON.stringify(manifest, null, 2));
-const cards = createCanvas(1240, 1040), ctx = cards.getContext('2d'); ctx.fillStyle = '#f7f8ef'; ctx.fillRect(0, 0, 1240, 1040); ctx.fillStyle = '#254b4e'; ctx.font = 'bold 26px Microsoft YaHei'; ctx.fillText('静态生产与建造图卡', 24, 39);
-const entries = [...ITEMS.map(key => [key, itemName(key)]), ['barracks', '兵营'], ['launcherWorks', '发射器工坊'], ['attachmentWorks', '配件工坊'], ['mine', '金矿']];
+const cards = createCanvas(1240, 1800), ctx = cards.getContext('2d'); ctx.fillStyle = '#f7f8ef'; ctx.fillRect(0, 0, 1240, 1040); ctx.fillStyle = '#254b4e'; ctx.font = 'bold 26px Microsoft YaHei'; ctx.fillText('静态生产与建造图卡', 24, 39);
+const entries = [...ITEMS.map(key => [key, itemName(key)]), ['barracks', '兵营'], ['launcherWorks', '发射器工坊'], ['attachmentWorks', '配件工厂'], ['mine', '金矿']];
 for (const [i, [key, name]] of entries.entries()) {
   const x = 20 + i % 4 * 305, y = 65 + Math.floor(i / 4) * 192;
   ctx.fillStyle = '#fffdf4'; ctx.fillRect(x, y, 285, 176); ctx.fillStyle = '#254b4e'; ctx.font = 'bold 17px Microsoft YaHei'; ctx.fillText(name, x + 12, y + 25);

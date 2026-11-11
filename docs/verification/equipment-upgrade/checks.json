@@ -1,0 +1,9 @@
+{
+  "tests": "Equipment UI, hover details, building cards, manual cancellations and refunds, narrow layout, real game boot, Node/Edge replay with research/construction/demolition/cancellation and mid-run restore",
+  "ticks": 1200,
+  "simulationMs": 439,
+  "hash": "42c8a4ebf8d3210f",
+  "browser": "157.0.4341.46",
+  "units": 120,
+  "errors": []
+}

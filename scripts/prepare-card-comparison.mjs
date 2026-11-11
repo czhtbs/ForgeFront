@@ -13,7 +13,8 @@ const review = new URL('../docs/art-direction/2026-11-ui-refinement/', import.me
 const original = new URL('generated-originals/', review), png = new URL('generated-png600/', review);
 const production = new URL('generated-webp600/', review);
 for (const dir of [original, png, production]) mkdirSync(dir, { recursive: true });
-const keys = [...ITEMS, 'barracks', 'launcherWorks', 'attachmentWorks', 'mine'];
+// Historical bitmap comparison covers the original nineteen generated cards.
+const keys = ['rifle', 'sword', 'blast', 'arc', 'burn', 'frost', 'pierce', 'bounce', 'split', 'return', 'homing', 'linger', 'trail', 'delay', 'lob', 'barracks', 'launcherWorks', 'attachmentWorks', 'mine'];
 const rows = [];
 for (const key of keys) {
   const source = new URL(`${key}.png`, original);

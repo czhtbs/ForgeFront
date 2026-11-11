@@ -43,7 +43,7 @@ test('out-of-range artillery approaches, stops at its group firing radius and pr
 test('artillery retargets a marching unit before each shot and damages it while it moves', () => {
   const w = quiet(), source = w.provinces[0], bounds = mapBounds(w.provinces), angle = Math.atan2(bounds.y - source.y, bounds.x - source.x);
   const point = { x: source.x + Math.cos(angle) * 72, y: source.y + Math.sin(angle) * 72 }, target = w.provinces.find(p => inside(point, p.polygon));
-  const shooter = gun(w, source), enemy = { ...soldier(w, 1), hp: 1000, position: point }; source.troops = [shooter];
+  const shooter = gun(w, source); shooter.effects.push('homing'); const enemy = { ...soldier(w, 1), hp: 1000, position: point }; source.troops = [shooter];
   w.shipments.push({ id: w.nextId++, owner: 1, from: target.id, to: source.id, path: [target.id, source.id], leg: 0, ...point, troops: [enemy] });
   assert.equal(orderUnits(w, [shooter.id], target.id, 0, point, [enemy.id]), null);
   for (let i = 0; i < 80; i++) {
@@ -52,7 +52,7 @@ test('artillery retargets a marching unit before each shot and damages it while 
     if (i === 0) assert.deepEqual(w.projectiles[0].aim, enemy.position);
     stepAttacks(w);
   }
-  assert.ok(enemy.hp < 1000); assert.equal(shooter.hp, 100);
+  assert.ok(enemy.hp < 1000); assert.equal(shooter.hp, 200);
 });
 
 test('artillery uses a fighting targets current world coordinates and reacquires surviving group members', () => {

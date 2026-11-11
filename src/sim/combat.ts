@@ -1,10 +1,12 @@
 import { sin, cos, atan2 } from './math.ts';
 import { WEAPONS, PAYLOADS, canFight, isWorkshop } from '../content/equipment.ts';
+import type { Payload } from '../content/equipment.ts';
 import { BATTLE_CAP, STEP, FORT } from './types.ts';
 import type { Battle, Fighter, Point, Soldier, World } from './types.ts';
-import { MOVE_SPEED, battleFrame, BATTLE_SPACING, buildingWidth, assignSlots, formation, toBattle, toWorld, SOLDIER_SIZE } from './spatial.ts';
+import { battleFrame, BATTLE_SPACING, buildingWidth, assignSlots, formation, toBattle, toWorld, SOLDIER_SIZE } from './spatial.ts';
 import { distance, inside } from './map.ts';
-import { fireAttack, hurt, hurtBuilding, visual } from './attacks.ts';
+import { fireAttack, hurt, hurtBuilding, triggerEffect, attackTargets } from './attacks.ts';
+import { attackInterval, moveSpeed } from './research.ts';
 import { BUILDING_HITS } from '../content/building-hits.ts';
 export function random(w: World) { w.rng = (Math.imul(w.rng, 1664525) + 1013904223) >>> 0; return w.rng / 4294967296; }
 export const DEPLOY_TICKS = 6;
@@ -77,6 +79,12 @@ export function stepBattle(w: World, b: Battle) {
     f.cooldown -= dt; f.recoil = Math.max(0, f.recoil - dt * (f.weapon === 'hilt' ? 4 : 7)); f.suppressed = Math.max(0, f.suppressed - dt);
     const stats = WEAPONS[f.weapon!];
     let target = b.fighters.find(t => t.id === f.target && t.owner !== f.owner && t.hp > 0);
+    if (f.chip === 'spread' && (!target || (f.retargetAt ?? 0) <= w.time)) {
+      const enemies = b.fighters.filter(t => t.owner !== f.owner && t.hp > 0 && distance(f, t) <= stats.range);
+      const assigned = (id: number) => b.fighters.filter(t => t.owner === f.owner && t.id !== f.id && t.hp > 0 && t.target === id).length;
+      target = enemies.sort((a, b) => assigned(a.id) - assigned(b.id) || distance(f, a) - distance(f, b) || a.id - b.id)[0] ?? target;
+      f.retargetAt = w.time + .5;
+    }
     if (!target) {
       let nearest = Infinity;
       for (const enemy of b.fighters) if (enemy.owner !== f.owner && enemy.hp > 0) {
@@ -88,35 +96,33 @@ export function stepBattle(w: World, b: Battle) {
     f.target = target?.id ?? (fort ? -1 : undefined); f.targetOwner = fort ? province.owner : undefined;
     if (f.effects.includes('lob') && !(fort && province.hp <= 0)) { f.position = toWorld(province, f); continue; }
     let advance = f.advanceTo ? toBattle(province, f.advanceTo) : undefined;
-    if (advance && (distance(f, advance) <= MOVE_SPEED / frame.scale * dt || (target || fort) && distance(f, target ?? FORT) - (fort ? FORT.radius : 0) <= stats.range)) { f.advanceTo = undefined; advance = undefined; }
+    if (advance && (distance(f, advance) <= moveSpeed(w, f) / frame.scale * dt || (target || fort) && distance(f, target ?? FORT) - (fort ? FORT.radius : 0) <= stats.range)) { f.advanceTo = undefined; advance = undefined; }
     if (!fort) f.fortAim = undefined;
     else f.fortAim ??= f.weapon === 'hilt' ? { x: FORT.x, y: FORT.y } : fortAim(w, b.province);
     const goal = advance ?? target ?? FORT;
     const nearest = Math.max(0, distance(f, fort && !advance ? FORT : goal) - (fort && !advance ? FORT.radius : 0));
     const aim = fort && !advance ? f.fortAim! : goal, desired = atan2(goal.y - f.y, goal.x - f.x), facing = atan2(aim.y - f.y, aim.x - f.x), delta = atan2(sin(facing - f.angle), cos(facing - f.angle));
     f.angle += Math.max(-dt * 7, Math.min(dt * 7, delta));
-    if ((advance || target || fort) && nearest > (advance ? 0 : fort && province.hp <= 0 ? 50 : stats.range * .9)) {
-      const speed = MOVE_SPEED / frame.scale * (f.suppressed > 0 ? .45 : f.chill! > 0 ? .6 : 1);
-      f.x += cos(desired) * speed * dt; f.y += sin(desired) * speed * dt;
+    const far = f.chip === 'far' && !!target && !advance, near = f.chip === 'near' && !!target && !advance;
+    const desiredRange = advance ? 0 : fort && province.hp <= 0 ? 50 : far ? stats.range * .95 : near ? 12 / frame.scale : stats.range * .9;
+    const retreating = far && nearest < stats.range * .85;
+    if ((advance || target || fort) && (nearest > desiredRange || retreating)) {
+      const speed = moveSpeed(w, f) / frame.scale * (f.suppressed > 0 ? .45 : 1) * (retreating ? -.75 : 1);
+      const next = { x: f.x + cos(desired) * speed * dt, y: f.y + sin(desired) * speed * dt };
+      if (!f.chip || inside(toWorld(province, next), province.polygon)) { f.x = next.x; f.y = next.y; }
     }
     f.position = toWorld(province, f);
     if (!advance && (target || fort) && nearest <= stats.range && f.cooldown <= 0 && (f.weapon === 'hilt' || Math.abs(delta) < .4)) {
-      f.cooldown = stats.interval; f.recoil = 1; b.shots++;
+      f.cooldown = attackInterval(w, f); f.recoil = 1; b.shots++;
       if (f.weapon === 'hilt') {
-        const amount = stats.damage * (1 + f.effects.filter(e => PAYLOADS.includes(e)).length * .2);
-        const enchantment = (point: Point) => {
-          for (const effect of f.effects) {
-            if (effect === 'blast') visual(w, 'blast', point, undefined, .35, 2);
-            if (effect === 'arc') visual(w, 'arc', f.position!, point);
-            if (effect === 'burn') visual(w, 'flame', point, undefined, .4);
-            if (effect === 'frost') visual(w, 'frost', point, undefined, .4);
-          }
-        };
-        if (fort) { const point = { x: f.position.x + cos(facing) * 3, y: f.position.y + sin(facing) * 3 }; hurtBuilding(w, province.id, f.owner, amount, point, false); enchantment(point); }
+        const payload = f.effects.find(e => PAYLOADS.includes(e)) as Payload | undefined;
+        let impact: Point | undefined;
+        if (fort) { impact = { x: f.position.x + cos(facing) * 3, y: f.position.y + sin(facing) * 3 }; hurtBuilding(w, province.id, f.owner, stats.damage, impact, false); }
         else {
           const enemies = b.fighters.filter(t => t.owner !== f.owner && t.hp > 0 && distance(f, t) <= stats.range).sort((a, b) => Number(b.id === f.target) - Number(a.id === f.target) || distance(f, a) - distance(f, b));
-          enemies.slice(0, f.effects.includes('pierce') ? 3 : 1).forEach((enemy, i) => { const point = toWorld(province, enemy); hurt(w, { unit: enemy, point, province: province.id, active: true }, f.owner, amount * .7 ** i, f.position!); enchantment(point); });
+          enemies.slice(0, f.effects.includes('pierce') ? 3 : 1).forEach(enemy => { const point = toWorld(province, enemy); impact ??= point; hurt(w, { unit: enemy, point, province: province.id, active: true }, f.owner, stats.damage, f.position!, 1, 'hilt'); });
         }
+        if (payload && impact) triggerEffect(w, { owner: f.owner, province: province.id, weapon: 'hilt' }, payload, impact, attackTargets(w));
       } else if (!fort || province.hp > 0) fireAttack(w, f, f.position!, toWorld(province, aim), province.id, target?.id ?? -province.id - 1);
       f.fortAim = undefined;
     }
@@ -139,5 +145,9 @@ export function stepBattle(w: World, b: Battle) {
       f.x += dx; f.y += dy; other.x -= dx; other.y -= dy;
     }
   }
-  for (const f of b.fighters) f.position = toWorld(province, f);
+  for (const f of b.fighters) {
+    let position = toWorld(province, f);
+    if (f.chip && !inside(position, province.polygon)) { position = f.position!; Object.assign(f, toBattle(province, position)); }
+    f.position = position;
+  }
 }

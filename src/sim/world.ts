@@ -1,15 +1,17 @@
 import { sin, cos, atan2 } from './math.ts';
-import { configuration, unitKey, canFight, canEquip, WEAPONS, LAUNCHERS, WORKSHOP_ITEMS, isWorkshop, ARTILLERY_MAX } from '../content/equipment.ts';
-import type { Effect, Item, Loadout, Weapon, Ammo, Launcher } from '../content/equipment.ts';
+import { configuration, unitKey, canFight, canEquip, WEAPONS, LAUNCHERS, WORKSHOP_ITEMS, isWorkshop, ARTILLERY_MAX, PRODUCTION, PAYLOADS, equip } from '../content/equipment.ts';
+import type { Item, Loadout, Weapon, Ammo } from '../content/equipment.ts';
 import { addBattle, stepBattle, queueReinforcements } from './combat.ts';
 import { createMap, distance, inside, movementPath, routePath, shortestPath, mapBounds, coastalCells } from './map.ts';
-import { CAPACITY, FACTION_COLORS, STEP, FORT } from './types.ts';
+import { CAPACITY, FACTION_COLORS, STEP, FORT, BUILDING_HP, BUILDING_COST, BUILDING_WORK_SECONDS } from './types.ts';
 import type { Building, Province, Settings, Soldier, Waypoint, World, Shipment, Point, Route, ArtilleryOrder } from './types.ts';
 import { MOVE_SPEED, assignSlots, formation, fortPosition, moveSoldier, marchOffset, toWorld, troopCenter } from './spatial.ts';
 import { artilleryAim, artilleryError, attackTargets, stepArtillery, stepAttacks, resolveDeaths } from './attacks.ts';
-export function soldier(w: World, owner: number, weapon: Weapon = 'launcher', ammo: Ammo = weapon === 'hilt' ? 'blade' : 'round'): Soldier { return { id: w.nextId++, owner, hp: 100, weapon, ammo, effects: [] }; }
+import { maxHealth, moveSpeed, unlocked, stepResearch } from './research.ts';
+export function soldier(w: World, owner: number, weapon: Weapon = 'launcher', ammo: Ammo = weapon === 'hilt' ? 'blade' : 'round'): Soldier { return { id: w.nextId++, owner, hp: maxHealth(w, { owner, weapon, ammo, effects: [] }), weapon, ammo, effects: [] }; }
+export const startingLandBonus = (count: number) => Math.max(2, Math.min(6, Math.round((count - 20) / 10)));
 export function createWorld(settings: Settings): World {
-  const w: World = { settings, time: 0, tick: 0, nextId: 1, rng: settings.seed >>> 0, provinces: createMap(settings.count, settings.seed), factions: [], routes: [], shipments: [], battles: [], flows: [], casualties: [], projectiles: [], fields: [], visuals: [], winner: null, stats: [], result: null };
+  const w: World = { settings, time: 0, tick: 0, nextId: 1, rng: settings.seed >>> 0, provinces: createMap(settings.count, settings.seed), factions: [], routes: [], shipments: [], battles: [], flows: [], casualties: [], projectiles: [], fields: [], pendingEffects: [], visuals: [], winner: null, stats: [], result: null };
   const occupied = new Set<number>();
   const bounds = mapBounds(w.provinces), coast = coastalCells(w.provinces);
   for (let id = 0; id <= settings.enemies; id++) {
@@ -18,15 +20,19 @@ export function createWorld(settings: Settings): World {
     const hq = w.provinces.filter(p => !occupied.has(p.id) && p.neighbors.some(n => !occupied.has(n))).sort((a, b) => Number(coast.has(b.id)) - Number(coast.has(a.id)) || distance(a, target) - distance(b, target))[0];
     const mine = hq.neighbors.map(n => w.provinces[n]).filter(p => !occupied.has(p.id)).sort((a, b) => Number(coast.has(a.id)) - Number(coast.has(b.id)) || distance(a, bounds) - distance(b, bounds))[0];
     occupied.add(hq.id); occupied.add(mine.id);
-    w.factions.push({ id, name: id === 0 ? '玩家' : `AI ${id}`, color: FACTION_COLORS[id], gold: 350, hq: hq.id, alive: true, ai: id !== 0 && !settings.training && !settings.tutorial });
+    w.factions.push({ id, name: id === 0 ? '玩家' : `AI ${id}`, color: FACTION_COLORS[id], gold: 350, research: [], hq: hq.id, alive: true, ai: id !== 0 && !settings.training && !settings.tutorial });
     w.stats.push({ kills: 0, losses: 0 });
     hq.owner = id; hq.building = 'hq'; mine.owner = id; mine.building = 'mine';
     hq.troops = Array.from({ length: 40 }, () => soldier(w, id)); assignSlots(hq, hq.troops);
   }
+  for (let round = 0; round < startingLandBonus(settings.count); round++) for (const f of w.factions) {
+    const home = w.provinces[f.hq];
+    const plot = w.provinces.filter(p => p.owner < 0 && p.neighbors.some(id => w.provinces[id].owner === f.id)).sort((a, b) => distance(a, home) - distance(b, home) || a.id - b.id)[0];
+    if (plot) plot.owner = f.id;
+  }
   if (settings.training) for (const p of w.provinces) if (p.owner < 0) p.owner = 0;
   if (settings.tutorial) {
     const home = w.provinces[w.factions[0].hq];
-    w.provinces[home.neighbors.find(id => w.provinces[id].owner < 0)!].owner = 0;
     home.troops = home.troops.slice(0, 12).map(s => ({ ...s, weapon: null, ammo: null, recruit: true }));
   }
   return w;
@@ -58,10 +64,11 @@ function arrivingEquipment(w: World, id: number) {
 const reservedTroops = (w: World, id: number) => localTroops(w, id, w.provinces[id].owner).length + w.shipments.filter(s => s.transferRoute !== undefined && s.to === id && s.owner === w.provinces[id].owner).reduce((n, s) => n + s.troops.length, 0);
 export function routeRate(w: World, from: number) {
   const p = w.provinces[from], count = w.routes.filter(r => r.from === from && r.owner === p.owner).length;
-  return count ? p.level / 4 / count : 0;
+  return count ? p.level / PRODUCTION[p.output] / count : 0;
 }
 export function productionState(w: World, id: number) {
   const p = w.provinces[id], config = configuration(configuredItems(w, id));
+  if (p.ammoConflict) config.error = '弹药冲突 · 停工';
   const inputs = arrivingEquipment(w, id), forwarding = outgoingRoutes(w, id).length > 0;
   const recruits = [...p.troops, ...p.mobile].filter(s => s.owner === p.owner && s.recruit);
   const pending = Object.fromEntries(config.items.map(item => [item, recruits.filter(s => canEquip(s, item)).length])) as Partial<Record<Item, number>>;
@@ -72,18 +79,54 @@ export function productionState(w: World, id: number) {
   return { ...config, inputs, pending, rate, count, incoming: reservedTroops(w, id) - count, waiting, forwarding, status };
 }
 export function build(w: World, id: number, building: NonNullable<Building>, owner = 0): string | null {
-  const p = w.provinces[id], f = w.factions[owner], cost = building === 'barracks' ? 140 : isWorkshop(building) ? 110 : 160;
+  const p = w.provinces[id], f = w.factions[owner], cost = building === 'hq' ? 0 : BUILDING_COST[building];
   if (p.owner !== owner || p.building || building === 'hq' || w.battles.some(b => b.province === id)) return '需要己方未交战的空地块';
   if (!w.settings.training && f.gold < cost) return `需要 ${cost} 黄金`;
   if (!w.settings.training) f.gold -= cost; p.building = building; p.level = 1; p.assembly = {};
+  p.work = { type: 'build', building, payer: owner, cost: w.settings.training ? 0 : cost, elapsed: 0 };
   if (isWorkshop(building)) p.output = WORKSHOP_ITEMS[building][0];
   return null;
 }
 export function upgrade(w: World, id: number, owner = 0): string | null {
   const p = w.provinces[id], cost = p.level * 100;
-  if (p.owner !== owner || !p.building || p.level >= 5) return '该建筑无法升级';
+  if (p.owner !== owner || !p.building || p.work || p.building === 'researchLab' || p.level >= 5) return '该建筑无法升级';
   if (!w.settings.training && w.factions[owner].gold < cost) return `需要 ${cost} 黄金`;
-  if (!w.settings.training) w.factions[owner].gold -= cost; p.level++; return null;
+  if (!w.settings.training) w.factions[owner].gold -= cost;
+  p.work = { type: 'upgrade', building: p.building, payer: owner, cost: w.settings.training ? 0 : cost, elapsed: 0 }; return null;
+}
+export function demolish(w: World, id: number, owner = 0): string | null {
+  const p = w.provinces[id];
+  if (p.owner !== owner || !p.building || p.building === 'hq' || p.work) return '该建筑无法拆除';
+  p.work = { type: 'demolish', building: p.building, payer: owner, cost: w.settings.training ? 0 : BUILDING_COST[p.building] / 2, elapsed: 0 }; return null;
+}
+export function cancelUpgrade(w: World, id: number, owner = 0): string | null {
+  const p = w.provinces[id];
+  if (p.owner !== owner || p.work?.type !== 'upgrade') return '没有可取消的升级';
+  w.factions[p.work.payer].gold += p.work.cost; p.work = undefined; return null;
+}
+export function cancelBuildingWork(w: World, id: number, type: 'build' | 'demolish', owner = 0): string | null {
+  const p = w.provinces[id];
+  if (p.owner !== owner || p.work?.type !== type) return '没有可取消的工程';
+  if (type === 'build') { w.factions[p.work.payer].gold += p.work.cost; removeBuilding(w, p); }
+  else p.work = undefined;
+  return null;
+}
+export const buildingWorkPaused = (w: World, p: Province) => !!p.work && p.work.type !== 'upgrade' && localTroops(w, p.id).some(s => s.owner !== p.owner && s.hp > 0);
+function removeBuilding(w: World, p: Province) {
+  const affected = new Set<number>();
+  for (const r of w.routes) if (r.from === p.id) affected.add(r.to);
+  for (const id of affected) for (const r of outgoingRoutes(w, id)) affected.add(r.to);
+  p.building = null; p.level = 1; p.work = undefined; p.research = undefined; p.assembly = {}; p.recruitment = 0; p.ammoConflict = false;
+  w.routes = w.routes.filter(r => r.from !== p.id && r.to !== p.id); markAmmoConflicts(w, affected);
+}
+export function stepBuildingWork(w: World) {
+  for (const p of w.provinces) if (p.work && !buildingWorkPaused(w, p)) {
+    p.work.elapsed += STEP;
+    if (p.work.elapsed + 1e-8 < BUILDING_WORK_SECONDS) continue;
+    if (p.work.type === 'upgrade') p.level++;
+    if (p.work.type === 'demolish') { w.factions[p.owner].gold += p.work.cost; removeBuilding(w, p); }
+    p.work = undefined;
+  }
 }
 export function supplyConflict(w: World, from: number, to: number, item = w.provinces[from].output) {
   const owner = w.provinces[from].owner, targets = new Set([to]);
@@ -92,7 +135,7 @@ export function supplyConflict(w: World, from: number, to: number, item = w.prov
   const routes = [...w.routes, { from, to, owner }];
   for (const id of targets) {
     const items = supplySources(w, id, routes).map(p => p.id === from ? item : p.output);
-    const error = configuration(items).error;
+    const error = configuration(items, true).error;
     if (error) return `${w.provinces[id].name}：${error}`;
   }
   return null;
@@ -101,11 +144,12 @@ export function setFactoryOutput(w: World, from: number, item: Item, owner = 0):
   const p = w.provinces[from];
   if (p.owner !== owner || !isWorkshop(p.building)) return '请选择己方工坊';
   if (!WORKSHOP_ITEMS[p.building].includes(item)) return '该工坊不能生产此类装备';
+  if (!unlocked(w, owner, item)) return '尚未研发解锁';
   for (const route of w.routes.filter(r => r.from === from && r.owner === owner)) {
     const error = supplyConflict(w, from, route.to, item);
     if (error) return error;
   }
-  p.output = item; return null;
+  p.output = item; markAmmoConflicts(w); return null;
 }
 export function connect(w: World, from: number, to: number, owner = 0): string | null {
   const a = w.provinces[from], b = w.provinces[to];
@@ -115,15 +159,29 @@ export function connect(w: World, from: number, to: number, owner = 0): string |
   const path = shortestPath(w.provinces, from, to, owner); if (!path.length) return '己方领土间没有连通路线';
   w.routes.push({ id: w.nextId++, owner, from, to, item: isWorkshop(a.building) ? a.output : 'recruits', via: [], path, status: 'normal' });
   for (const s of [...a.troops, ...a.mobile]) s.transferRoute = undefined;
-  a.transferCursor = 0; return null;
+  a.transferCursor = 0; markAmmoConflicts(w); return null;
 }
 export function reroute(w: World, id: number, via: Waypoint[], owner = 0): string | null {
   const route = w.routes.find(r => r.id === id); if (!route || route.owner !== owner) return '无法编辑该路线';
   const path = routePath(w.provinces, route.from, route.to, via.map(v => v.province), owner); if (!path.length) return '路径点必须在连通的己方领土内';
   route.via = via.map(v => ({ ...v })); route.path = path; return null;
 }
-export function disconnect(w: World, id: number, owner = 0) { w.routes = w.routes.filter(r => r.id !== id || r.owner !== owner); }
-const cleanSoldier = (s: Soldier): Soldier => ({ id: s.id, owner: s.owner, hp: s.hp, weapon: s.weapon, ammo: s.ammo, effects: [...s.effects], recruit: s.recruit, position: s.position ? { ...s.position } : undefined, angle: s.angle, chill: s.chill, frozen: s.frozen, bombard: s.bombard, artilleryCooldown: s.artilleryCooldown });
+function markAmmoConflicts(w: World, disconnected = new Set<number>()) {
+  for (const p of w.provinces) if (p.building === 'hq' || p.building === 'barracks') {
+    const conflict = configuredItems(w, p.id).filter(i => PAYLOADS.includes(i as any)).length > 1;
+    if (conflict || disconnected.has(p.id)) p.ammoConflict = conflict;
+  }
+}
+export function disconnect(w: World, id: number, owner = 0) {
+  const route = w.routes.find(r => r.id === id && r.owner === owner); if (!route) return;
+  const affected = new Set([route.to]);
+  for (const target of affected) for (const r of outgoingRoutes(w, target)) affected.add(r.to);
+  w.routes = w.routes.filter(r => r !== route); markAmmoConflicts(w, affected);
+}
+const cleanSoldier = (s: Soldier): Soldier => {
+  const { target, targetOwner, fortAim, x, y, ...unit } = s as import('./types.ts').Fighter;
+  return { ...unit, effects: [...s.effects], position: s.position && { ...s.position } };
+};
 function station(p: Province, troops: Soldier[]) { const room = Math.max(0, CAPACITY - p.troops.length); p.troops.push(...troops.slice(0, room)); p.mobile.push(...troops.slice(room)); assignSlots(p, [...p.troops, ...p.mobile]); }
 function send(w: World, from: number, to: number, path: number[], troops: Soldier[], owner: number, transferRoute?: number) {
   assignSlots(w.provinces[from], troops);
@@ -227,14 +285,14 @@ function defeat(w: World, owner: number) {
   const remaining = w.factions.filter(f => f.alive && f.id !== owner);
   if (!w.settings.training && (!w.settings.multiplayer && owner === 0 || remaining.length === 1)) { endMatch(w); w.winner = remaining[0].id; }
   w.factions[owner].alive = false;
-  for (const p of w.provinces) { if (p.owner === owner) p.owner = -1; p.troops = p.troops.filter(s => s.owner !== owner); p.mobile = p.mobile.filter(s => s.owner !== owner); }
+  for (const p of w.provinces) { if (p.owner === owner) { removeBuilding(w, p); p.owner = -1; } p.troops = p.troops.filter(s => s.owner !== owner); p.mobile = p.mobile.filter(s => s.owner !== owner); }
   for (const b of w.battles) { b.fighters = b.fighters.filter(s => s.owner !== owner); b.reserve = b.reserve.filter(s => s.owner !== owner); }
   w.shipments = w.shipments.filter(s => s.owner !== owner); w.routes = w.routes.filter(r => r.owner !== owner); w.flows = w.flows.filter(f => f.owner !== owner);
 }
 export function surrender(w: World, owner: number) { if (w.factions[owner].alive) defeat(w, owner); }
 function transferRecruits(w: World) {
   for (const p of w.provinces) {
-    if (p.building !== 'hq' && p.building !== 'barracks') continue;
+    if (p.building !== 'hq' && p.building !== 'barracks' || p.ammoConflict || p.work?.type === 'build') continue;
     const routes = outgoingRoutes(w, p.id); if (!routes.length) continue;
     const recruits = [...p.troops, ...p.mobile].filter(s => s.owner === p.owner && s.recruit && !s.weapon).sort((a, b) => a.id - b.id);
     for (const s of recruits) if (!routes.some(r => r.id === s.transferRoute)) {
@@ -267,12 +325,12 @@ function logistics(w: World) {
     r.path = routePath(w.provinces, r.from, r.to, r.via.map(v => v.province), r.owner);
     if (!r.path.length) { r.status = 'cut'; continue; }
     const source = w.provinces[r.from]; r.item = isWorkshop(source.building) ? source.output : 'recruits';
-    const blocked = source.hp <= 0 || w.provinces[r.to].hp <= 0 || w.battles.some(b => b.province === r.from), contested = r.path.some(id => w.battles.some(b => b.province === id));
+    const blocked = source.work?.type === 'build' || w.provinces[r.to].work?.type === 'build' || source.ammoConflict || w.provinces[r.to].ammoConflict || source.hp <= 0 || w.provinces[r.to].hp <= 0 || w.battles.some(b => b.province === r.from), contested = r.path.some(id => w.battles.some(b => b.province === id));
     r.status = blocked ? 'idle' : contested ? 'delayed' : 'normal';
     // One-second flow intervals model transport delay, not inventory; unused arrivals expire.
     if (!blocked && w.tick % 30 === 1) {
       const start = w.tick + (r.path.length - 1) * 90 * (contested ? 2 : 1);
-      const inputs = r.item === 'recruits' ? arrivingEquipment(w, r.from) : { [source.output]: source.level / 4 };
+      const inputs = r.item === 'recruits' ? arrivingEquipment(w, r.from) : unlocked(w, source.owner, source.output) ? { [source.output]: source.level / PRODUCTION[source.output] } : {};
       const count = outgoingRoutes(w, r.from).length;
       for (const [item, rate] of Object.entries(inputs)) w.flows.push({ owner: r.owner, from: r.from, to: r.to, item: item as Item, rate: rate / count, start, end: start + 30 });
     }
@@ -302,7 +360,7 @@ function logistics(w: World) {
         const home = s.path[Math.max(0, s.leg)]; s.path = [home]; s.leg = -1; s.to = home; next = home;
       }
     }
-    const goal = w.provinces[next], gap = distance(s, goal), step = MOVE_SPEED * STEP;
+    const goal = w.provinces[next], gap = distance(s, goal), step = Math.min(...s.troops.map(t => moveSpeed(w, t))) * STEP;
     const angle = atan2(goal.y - s.y, goal.x - s.x);
     if (gap > step) { s.x += (goal.x - s.x) / gap * step; s.y += (goal.y - s.y) / gap * step; }
     else { s.x = goal.x; s.y = goal.y; s.leg++; }
@@ -322,10 +380,10 @@ function logistics(w: World) {
 }
 function production(w: World) {
   for (const p of w.provinces) {
-    if (p.owner < 0 || !w.factions[p.owner].alive || !p.building || p.hp <= 0) continue;
+    if (p.owner < 0 || !w.factions[p.owner].alive || !p.building || p.hp <= 0 || p.work?.type === 'build') continue;
     const battle = w.battles.find(b => b.province === p.id);
     if (p.building === 'mine') { if (!battle) w.factions[p.owner].gold += STEP * (3 + p.level); continue; }
-    if (isWorkshop(p.building)) continue;
+    if (isWorkshop(p.building) || p.building === 'researchLab' || p.ammoConflict) continue;
     if (!battle && p.mobile.length && p.troops.length < CAPACITY) p.troops.push(...p.mobile.splice(0, CAPACITY - p.troops.length));
     const count = reservedTroops(w, p.id);
     if (count >= CAPACITY) p.recruitment = 0;
@@ -344,8 +402,8 @@ function production(w: World) {
       if (!candidates.length || !state.inputs[item]) { p.assembly[item] = 0; continue; }
       const progress = (p.assembly[item] ?? 0) + STEP * state.inputs[item]!, amount = Math.min(candidates.length, Math.floor(progress + 1e-9));
       for (const unit of candidates.slice(0, amount)) {
-        if (item in LAUNCHERS) { const base = LAUNCHERS[item as Launcher]; unit.weapon = base.weapon; unit.ammo = base.ammo; }
-        else { unit.effects.push(item as Effect); unit.effects.sort(); }
+        const previousMax = maxHealth(w, unit);
+        equip(unit, item); unit.hp *= maxHealth(w, unit) / previousMax;
       }
       p.assembly[item] = amount === candidates.length ? 0 : Math.max(0, progress - amount);
     }
@@ -360,11 +418,11 @@ export function stepWorld(w: World) {
   if (w.winner !== null) return;
   w.tick++; w.time = w.tick * STEP;
   w.casualties = w.casualties.filter(c => w.time - c.time < 5);
-  advanceArtillery(w); logistics(w); production(w);
+  stepResearch(w); advanceArtillery(w); logistics(w); production(w);
   for (const p of w.provinces) {
     const troops = [...p.troops, ...p.mobile]; assignSlots(p, troops);
     const slots = formation(p, Math.max(0, ...troops.map(s => s.slot! + 1)));
-    for (const s of troops) if (!s.bombard) moveSoldier(s, slots[s.slot!], MOVE_SPEED * STEP);
+    for (const s of troops) if (!s.bombard) moveSoldier(s, slots[s.slot!], moveSpeed(w, s) * STEP);
   }
   for (const b of [...w.battles]) stepBattle(w, b);
   stepArtillery(w); stepAttacks(w); resolveDeaths(w);
@@ -372,11 +430,12 @@ export function stepWorld(w: World) {
     const p = w.provinces[b.province];
     const occupier = b.fighters.find(f => f.hp > 0 && f.owner !== p.owner && distance(f, FORT) <= FORT.radius + 70);
     if (p.hp <= 0 && occupier) {
-      const old = p.owner, owner = occupier.owner, hq = p.building === 'hq';
-      p.owner = owner; p.hp = 1000; b.models = false;
+      const old = p.owner, owner = occupier.owner, hq = old >= 0 && w.factions[old].hq === p.id;
+      p.owner = owner; p.hp = BUILDING_HP; p.research = undefined; p.ammoConflict = false; b.models = false;
       w.routes = w.routes.filter(r => r.from !== p.id && r.to !== p.id); p.assembly = {}; p.recruitment = 0;
       for (const s of [...p.troops, ...p.mobile]) if (s.recruit && !canFight(s)) s.owner = owner;
-      if (hq) p.building = 'barracks';
+      if (p.work?.type === 'build') { w.factions[p.work.payer].gold += p.work.cost; removeBuilding(w, p); }
+      else if (p.work?.type === 'demolish') { w.factions[owner].gold += p.work.cost; removeBuilding(w, p); }
       for (const f of b.fighters) { f.target = undefined; f.targetOwner = undefined; }
       if (hq && old >= 0) defeat(w, old);
     }
@@ -387,16 +446,17 @@ export function stepWorld(w: World) {
     }
     if (w.winner !== null) break;
   }
+  stepBuildingWork(w);
   for (const p of w.provinces) {
     const attacking = w.battles.find(b => b.province === p.id)?.fighters.some(f => f.target === -1 && f.targetOwner === p.owner && distance(f, FORT) <= WEAPONS[f.weapon!].range + FORT.radius);
-    if (!attacking && w.time - p.lastHit > 8) p.hp = Math.min(1000, p.hp + STEP * 50);
+    if (!attacking && w.time - p.lastHit > 8) p.hp = Math.min(BUILDING_HP, p.hp + STEP * 150);
   }
 }
 export function trainingBattle(w: World, loadout: Loadout, amount = 40) {
   const target = w.factions[1].hq;
-  w.battles = []; w.shipments = []; w.casualties = []; w.projectiles = []; w.fields = []; w.visuals = []; w.winner = null; w.result = null; w.stats.forEach(s => { s.kills = 0; s.losses = 0; });
-  const p = w.provinces[target]; p.owner = 1; p.building = null; p.hp = 1000; p.troops = []; p.mobile = [];
-  const allies = Array.from({ length: amount }, () => ({ ...soldier(w, 0, loadout.weapon!, loadout.ammo!), effects: [...loadout.effects] }));
+  w.battles = []; w.shipments = []; w.casualties = []; w.projectiles = []; w.fields = []; w.pendingEffects = []; w.visuals = []; w.winner = null; w.result = null; w.stats.forEach(s => { s.kills = 0; s.losses = 0; });
+  const p = w.provinces[target]; p.owner = 1; p.building = null; p.hp = BUILDING_HP; p.troops = []; p.mobile = [];
+  const allies = Array.from({ length: amount }, () => ({ ...soldier(w, 0, loadout.weapon!, loadout.ammo!), ...loadout, effects: [...loadout.effects] }));
   const enemies = Array.from({ length: amount }, () => soldier(w, 1, 'launcher'));
   if (loadout.effects.includes('lob')) {
     for (const province of w.provinces) { province.troops = []; province.mobile = []; }

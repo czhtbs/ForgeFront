@@ -24,10 +24,10 @@ test('melee attacks damage buildings without ranged yellow hit marks and retain 
   const b = addBattle(w, p.id, [soldier(w, 0, 'hilt')]); reinforce(w, b);
   const fighter = b.fighters[0]; fighter.x = FORT.x - FORT.radius - 35; fighter.y = FORT.y; fighter.angle = 0; fighter.cooldown = 0;
   const hp = p.hp; stepBattle(w, b);
-  assert.equal(p.hp, hp - 28); assert.equal(fighter.recoil, 1); assert.equal(w.projectiles.length, 0);
+  assert.equal(p.hp, hp - 50); assert.equal(fighter.recoil, 1); assert.equal(w.projectiles.length, 0);
   assert.ok(!w.visuals.some(v => v.kind === 'fort-hit'));
   for (let i = 0; i < 6; i++) stepBattle(w, b); assert.ok(fighter.recoil > 0);
-  for (let i = 0; i < 3; i++) stepBattle(w, b); assert.equal(fighter.recoil, 0); assert.equal(p.hp, hp - 28);
+  for (let i = 0; i < 3; i++) stepBattle(w, b); assert.equal(fighter.recoil, 0); assert.equal(p.hp, hp - 50);
 });
 
 test('ground relief is deterministic, varied and continuous across arbitrary province borders', () => {
@@ -104,7 +104,7 @@ test('fort shots aim and land at different opaque locations on each building spr
   const attacker = b.fighters[0]; attacker.x = FORT.x - 180; attacker.y = FORT.y; attacker.angle = 0; attacker.cooldown = 0;
   const impacts = new Set<string>();
   for (let i = 0; i < 180; i++) { stepBattle(w, b); stepAttacks(w); resolveDeaths(w); for (const v of w.visuals) if (v.kind === 'fort-hit') impacts.add(`${v.x},${v.y}`); }
-  assert.ok(p.hp < 1000); assert.ok(impacts.size > 5);
+  assert.ok(p.hp < 3000); assert.ok(impacts.size > 5);
   const near = fortAim(w, p.id), hp = p.hp; attacker.x = near.x - 1; attacker.y = near.y; attacker.fortAim = near; attacker.angle = 0; attacker.cooldown = 0;
   stepBattle(w, b); stepAttacks(w); resolveDeaths(w); assert.ok(p.hp < hp); assert.ok(w.visuals.some(v => v.kind === 'fort-hit' && v.x === (battleFrame(p).x + near.x * battleFrame(p).scale) && v.y === (battleFrame(p).y + near.y * battleFrame(p).scale)));
 });

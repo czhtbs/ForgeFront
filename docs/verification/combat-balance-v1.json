@@ -1,0 +1,450 @@
+{
+  "status": "candidate values, not implemented or validated in the game engine",
+  "assumptions": [
+    "30 Hz 1D model; no formation, obstacles, suppression or collision congestion",
+    "duels use baseline combat stats; research upgrades are checked arithmetically, and kiting assumes an equipped distance chip",
+    "units begin ready to attack; simultaneous damage and in-flight shots retained",
+    "ranged retreats at 75% speed below 85% range; capped by available retreat space",
+    "all ranged shots hit; blast and arc include only one victim",
+    "fire, frost, weapon accessories, groups and production excluded from duels"
+  ],
+  "armor": [
+    {
+      "armor": 0,
+      "direct": 50,
+      "direct_plus_blast": 90,
+      "direct_plus_arc": 80,
+      "fire_per_tick": 10,
+      "hits_to_kill_ranged": 4,
+      "hits_to_kill_melee": 8
+    },
+    {
+      "armor": 10,
+      "direct": 40,
+      "direct_plus_blast": 70,
+      "direct_plus_arc": 70,
+      "fire_per_tick": 0,
+      "hits_to_kill_ranged": 5,
+      "hits_to_kill_melee": 10
+    },
+    {
+      "armor": 20,
+      "direct": 30,
+      "direct_plus_blast": 50,
+      "direct_plus_arc": 60,
+      "fire_per_tick": 0,
+      "hits_to_kill_ranged": 7,
+      "hits_to_kill_melee": 14
+    },
+    {
+      "armor": 30,
+      "direct": 20,
+      "direct_plus_blast": 30,
+      "direct_plus_arc": 50,
+      "fire_per_tick": 0,
+      "hits_to_kill_ranged": 10,
+      "hits_to_kill_melee": 20
+    }
+  ],
+  "duels": [
+    {
+      "distance": 6,
+      "kite": false,
+      "winner": "melee",
+      "seconds": 3.3,
+      "ranged_hp": 0,
+      "melee_hp": 200.0
+    },
+    {
+      "distance": 6,
+      "kite": true,
+      "winner": "melee",
+      "seconds": 3.3,
+      "ranged_hp": 0,
+      "melee_hp": 200.0
+    },
+    {
+      "distance": 24,
+      "kite": false,
+      "winner": "melee",
+      "seconds": 4.4,
+      "ranged_hp": 0,
+      "melee_hp": 150.0
+    },
+    {
+      "distance": 24,
+      "kite": true,
+      "winner": "melee",
+      "seconds": 5.87,
+      "ranged_hp": 0,
+      "melee_hp": 50.0
+    },
+    {
+      "distance": 36,
+      "kite": false,
+      "winner": "melee",
+      "seconds": 5.17,
+      "ranged_hp": 0,
+      "melee_hp": 100.0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "winner": "ranged",
+      "seconds": 6.33,
+      "ranged_hp": 50.0,
+      "melee_hp": 0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "ranged_effect": "none",
+      "melee_effect": "none",
+      "ranged_armor": 0,
+      "melee_armor": 20,
+      "winner": "melee",
+      "seconds": 8.17,
+      "ranged_hp": 0,
+      "melee_hp": 100.0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "ranged_effect": "none",
+      "melee_effect": "none",
+      "ranged_armor": 0,
+      "melee_armor": 30,
+      "winner": "melee",
+      "seconds": 10.17,
+      "ranged_hp": 0,
+      "melee_hp": 160.0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "ranged_effect": "blast",
+      "melee_effect": "none",
+      "ranged_armor": 0,
+      "melee_armor": 20,
+      "winner": "ranged",
+      "seconds": 6.8,
+      "ranged_hp": 100.0,
+      "melee_hp": 0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "ranged_effect": "blast",
+      "melee_effect": "none",
+      "ranged_armor": 0,
+      "melee_armor": 30,
+      "winner": "melee",
+      "seconds": 10.17,
+      "ranged_hp": 0,
+      "melee_hp": 70.0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "ranged_effect": "arc",
+      "melee_effect": "none",
+      "ranged_armor": 0,
+      "melee_armor": 20,
+      "winner": "ranged",
+      "seconds": 5.83,
+      "ranged_hp": 150.0,
+      "melee_hp": 0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "ranged_effect": "arc",
+      "melee_effect": "none",
+      "ranged_armor": 0,
+      "melee_armor": 30,
+      "winner": "ranged",
+      "seconds": 6.8,
+      "ranged_hp": 200.0,
+      "melee_hp": 0
+    },
+    {
+      "distance": 36,
+      "kite": true,
+      "retreat_space": 0,
+      "winner": "melee",
+      "seconds": 5.17,
+      "ranged_hp": 0,
+      "melee_hp": 100.0
+    }
+  ],
+  "cadence": {
+    "effects": {
+      "blast": 0.05,
+      "burn": 0.1,
+      "frost": 0.05,
+      "arc": 0.05
+    },
+    "accessories": {
+      "pierce": 0.05,
+      "bounce": 0.05,
+      "split": 0.1,
+      "return": 0.05,
+      "homing": 0.02,
+      "linger": 0.05,
+      "trail": 0.1,
+      "delay": 0,
+      "lob": 0.1
+    },
+    "rifle": {
+      "checked_combinations": 336,
+      "maximum_interval": 1.3
+    },
+    "sword_upper_bound": {
+      "checked_combinations": 336,
+      "maximum_interval": 1.5
+    },
+    "sword_compatibility": "only pierce is currently proposed; the triple check is a conservative mathematical bound",
+    "rifle_all_accessories_with_burn": 1.52
+  },
+  "trail": {
+    "additional_triggers_per_projectile": 4,
+    "initial_range_fractions": [
+      0.2,
+      0.4,
+      0.6,
+      0.8
+    ],
+    "maximum_effect_triggers_parent_and_three_children": 20
+  },
+  "fire": {
+    "raw_per_tick": 10,
+    "interval_seconds": 0.25,
+    "duration_seconds": 4,
+    "maximum_ticks_from_one_region": 16,
+    "maximum_raw_damage": 160,
+    "technology": [
+      {
+        "effect_level": 0,
+        "fire_per_tick": 10,
+        "dps_against_armor_0_10_20_30": [
+          40,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "effect_level": 1,
+        "fire_per_tick": 16,
+        "dps_against_armor_0_10_20_30": [
+          64,
+          24,
+          0,
+          0
+        ]
+      },
+      {
+        "effect_level": 2,
+        "fire_per_tick": 24,
+        "dps_against_armor_0_10_20_30": [
+          96,
+          56,
+          16,
+          0
+        ]
+      },
+      {
+        "effect_level": 3,
+        "fire_per_tick": 34,
+        "dps_against_armor_0_10_20_30": [
+          136,
+          96,
+          56,
+          16
+        ]
+      }
+    ]
+  },
+  "frost": {
+    "cold_per_second": 50,
+    "threshold": 100,
+    "freeze_seconds": 1,
+    "immune_seconds_after_thaw": 1,
+    "minimum_repeat_cycle_seconds": 4,
+    "maximum_tier_freeze_fraction": 0.42857142857142855
+  },
+  "research": {
+    "projects": [
+      {
+        "name": "高爆填装",
+        "gold": 140,
+        "seconds": 25
+      },
+      {
+        "name": "增量装药",
+        "gold": 280,
+        "seconds": 45
+      },
+      {
+        "name": "高能爆破",
+        "gold": 520,
+        "seconds": 70
+      },
+      {
+        "name": "高热燃料",
+        "gold": 120,
+        "seconds": 25
+      },
+      {
+        "name": "扩散燃剂",
+        "gold": 260,
+        "seconds": 40
+      },
+      {
+        "name": "炽焰燃剂",
+        "gold": 480,
+        "seconds": 65
+      },
+      {
+        "name": "冷媒提纯",
+        "gold": 160,
+        "seconds": 30
+      },
+      {
+        "name": "低温结晶",
+        "gold": 320,
+        "seconds": 50
+      },
+      {
+        "name": "深冻结晶",
+        "gold": 600,
+        "seconds": 80
+      },
+      {
+        "name": "电容扩充",
+        "gold": 180,
+        "seconds": 30
+      },
+      {
+        "name": "多路放电",
+        "gold": 360,
+        "seconds": 55
+      },
+      {
+        "name": "过载电网",
+        "gold": 650,
+        "seconds": 85
+      },
+      {
+        "name": "目标引导",
+        "gold": 100,
+        "seconds": 20
+      },
+      {
+        "name": "多弹分裂",
+        "gold": 260,
+        "seconds": 45
+      },
+      {
+        "name": "轨迹释放",
+        "gold": 280,
+        "seconds": 45
+      },
+      {
+        "name": "弹道抛射",
+        "gold": 240,
+        "seconds": 40
+      },
+      {
+        "name": "复合护板",
+        "gold": 140,
+        "seconds": 30
+      },
+      {
+        "name": "重型装甲",
+        "gold": 340,
+        "seconds": 60
+      },
+      {
+        "name": "距离控制",
+        "gold": 140,
+        "seconds": 25
+      },
+      {
+        "name": "抵近压制",
+        "gold": 100,
+        "seconds": 20
+      },
+      {
+        "name": "火力分配",
+        "gold": 180,
+        "seconds": 30
+      },
+      {
+        "name": "体能训练",
+        "gold": 180,
+        "seconds": 35
+      },
+      {
+        "name": "战地强化",
+        "gold": 360,
+        "seconds": 60
+      },
+      {
+        "name": "极限体魄",
+        "gold": 700,
+        "seconds": 90
+      },
+      {
+        "name": "战斗熟练",
+        "gold": 220,
+        "seconds": 40
+      },
+      {
+        "name": "动作优化",
+        "gold": 440,
+        "seconds": 65
+      },
+      {
+        "name": "连续攻击",
+        "gold": 800,
+        "seconds": 100
+      },
+      {
+        "name": "行军训练",
+        "gold": 160,
+        "seconds": 30
+      },
+      {
+        "name": "步态优化",
+        "gold": 320,
+        "seconds": 50
+      },
+      {
+        "name": "快速行军",
+        "gold": 600,
+        "seconds": 80
+      }
+    ],
+    "total_gold": 9630,
+    "total_seconds_one_lab": 1465,
+    "health_multipliers": [
+      1,
+      1.15,
+      1.3,
+      1.5
+    ],
+    "attack_frequency_multipliers": [
+      1,
+      1.1,
+      1.2,
+      1.3
+    ],
+    "movement_multipliers": [
+      1,
+      1.05,
+      1.1,
+      1.15
+    ]
+  }
+}

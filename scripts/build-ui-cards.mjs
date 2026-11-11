@@ -30,7 +30,7 @@ const diagrams = {
   lob: source + '<path d="M150 20V135" stroke="#99ad8c" stroke-width="2" stroke-dasharray="5 6"/>' + troop(253, 101) + arrow('M64 78Q156-25 239 91') + '<ellipse cx="166" cy="106" rx="9" ry="3" fill="#63785b" opacity=".2"/><circle cx="167" cy="36" r="5" fill="#d6ab54"/>',
 };
 const shell = inner => `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 300 150"><defs><linearGradient id="ground" x2="1" y2="1"><stop stop-color="#eff2e2"/><stop offset="1" stop-color="#dce9d4"/></linearGradient><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1L9 5 1 9Z" fill="#bd924c"/></marker></defs><path fill="url(#ground)" d="M0 0h300v150H0z"/><path d="M0 112Q74 81 158 118T300 105V150H0Z" fill="#ccdcbc" opacity=".25"/><g stroke="#829675" opacity=".14" stroke-width="1">${Array.from({ length: 14 }, (_, i) => `<path d="M${15 + i * 21} ${112 + i % 3 * 7}l5-2"/>`).join('')}</g>${inner}</svg>`;
-for (const item of ITEMS) {
+for (const item of Object.keys(diagrams)) {
   assert.ok(diagrams[item], `Missing card: ${item}`);
   writeFileSync(new URL(`${item}.svg`, output), shell(diagrams[item]));
 }
@@ -40,4 +40,6 @@ for (const kind of ['barracks', 'launcherWorks', 'attachmentWorks', 'mine']) {
   const product = kind === 'barracks' ? troop(237, 81, false) + troop(263, 100, false) : kind === 'launcherWorks' ? `<g transform="translate(205 32) scale(.65)">${gun}</g>` : kind === 'attachmentWorks' ? crystal(237, 61, .8) + flame(258, 102, .6) : '<g fill="#dab65d" stroke="#a78441" stroke-width="2"><ellipse cx="247" cy="99" rx="23" ry="9"/><ellipse cx="247" cy="91" rx="23" ry="9"/><ellipse cx="247" cy="83" rx="23" ry="9"/><path d="M234 80l13-4 13 4-13 5Z" fill="#f4d98c"/></g>';
   writeFileSync(new URL(`${kind}.svg`, output), shell(`<image href="data:image/png;base64,${image}" x="26" y="2" width="145" height="145"/>${arrow('M172 81H204', '#81987c')}${product}`));
 }
-console.log(`Built ${ITEMS.length + 4} static UI cards.`);
+await import('./art/equipment.js');
+await import('./art/building-cards.mjs');
+console.log(`Built ${ITEMS.length + 8} static UI cards.`);

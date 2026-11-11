@@ -1,9 +1,12 @@
-import { canFight, isWorkshop, configuration, LAUNCHERS } from '../content/equipment.ts';
-import type { Item, Workshop } from '../content/equipment.ts';
+import { canFight, isWorkshop, configuration, LAUNCHERS, workshopFor } from '../content/equipment.ts';
+import type { Item } from '../content/equipment.ts';
 import type { World } from '../sim/types.ts';
 import { configuredItems, supplyConflict } from '../sim/world.ts';
 import { executeCommand } from '../sim/commands.ts';
 import type { Command } from '../sim/commands.ts';
+import { researchError, unlocked } from '../sim/research.ts';
+import { TECHNOLOGIES } from '../content/research.ts';
+import { BUILDING_COST } from '../sim/types.ts';
 import { shortestPath, movementPath, distance } from '../sim/map.ts';
 export function runAI(w: World, owner: number, act: (command: Command) => string | null = command => executeCommand(w, owner, command)) {
   const faction = w.factions[owner], land = w.provinces.filter(p => p.owner === owner);
@@ -22,16 +25,23 @@ export function runAI(w: World, owner: number, act: (command: Command) => string
   let built = false;
   for (const [index, home] of barracks.entries()) {
     const input = configuredItems(w, home.id), config = configuration(input), melee = config.weapon === 'hilt' || config.ammo === 'blade' || !config.weapon && !config.ammo && index % 3 === 1;
-    const wanted: Item[] = [input.find(i => i in LAUNCHERS) ?? (melee ? 'sword' : 'rifle'), ...(index % 3 === 2 ? ['lob', 'homing', 'blast'] as Item[] : melee ? ['pierce', 'frost'] as Item[] : ['pierce', 'burn'] as Item[])];
-    for (const item of wanted.filter(i => !input.includes(i))) {
+    const wanted: Item[] = [input.find(i => i in LAUNCHERS) ?? (melee ? 'sword' : 'rifle'), ...(index % 3 === 2 ? ['lob', 'homing', 'blast'] as Item[] : melee ? ['pierce', 'frost', 'rangedLight', 'spread'] as Item[] : ['pierce', 'burn', 'meleeLight', 'far'] as Item[])];
+    for (const item of wanted.filter(i => !input.includes(i) && unlocked(w, owner, i))) {
       const source = factories.filter(p => p.output === item && !supplyConflict(w, p.id, home.id)).map(p => ({ p, path: shortestPath(w.provinces, p.id, home.id, owner) })).filter(x => x.path.length).sort((a, b) => a.path.length - b.path.length)[0];
       if (source) { act({ type: 'connect', from: source.p.id, to: home.id }); continue; }
-      if (!built && empty.length && faction.gold >= 110) {
-        const location = empty.shift()!, kind: Workshop = item in LAUNCHERS ? 'launcherWorks' : 'attachmentWorks';
+      const kind = workshopFor(item);
+      if (!built && empty.length && faction.gold >= BUILDING_COST[kind]) {
+        const location = empty.shift()!;
         if (!act({ type: 'build', province: location.id, building: kind })) { act({ type: 'output', province: location.id, item }); act({ type: 'connect', from: location.id, to: home.id }); built = true; }
       }
       break;
     }
+  }
+  const labs = land.filter(p => p.building === 'researchLab');
+  if (!built && !labs.length && land.length >= 5 && empty.length && faction.gold >= 400) { if (!act({ type: 'build', province: empty.shift()!.id, building: 'researchLab' })) built = true; }
+  for (const lab of labs) if (!lab.research && faction.gold >= 260) {
+    const tech = TECHNOLOGIES.find(t => !researchError(w, lab.id, t.id, owner));
+    if (tech) act({ type: 'research', province: lab.id, technology: tech.id });
   }
   if (!built && empty.length && faction.gold > 220) act({ type: 'build', province: empty[0].id, building: land.filter(p => p.building === 'mine').length < Math.ceil(land.length / 5) ? 'mine' : 'barracks' });
   for (const p of land) {

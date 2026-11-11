@@ -41,7 +41,7 @@ test('authoritative AI commands replay with matching state, including snapshot r
 
 test('snapshot preserves shared artillery orders and every future combat state', () => {
   const server = createWorld(settings); server.factions.forEach(f => f.ai = false);
-  const home = server.provinces[server.factions[0].hq], target = server.provinces[home.neighbors.find(id => server.provinces[id].owner !== 0)!];
+  const home = server.provinces[server.factions[0].hq], target = server.provinces[home.neighbors[0]]; target.owner = 1;
   home.troops = ['burn', 'frost', 'blast', 'arc'].map(effect => ({ ...soldier(server, 0), effects: ['lob', effect] as any }));
   assert.equal(orderUnits(server, home.troops.map(s => s.id), target.id), null);
   const client = decodeState(encodeState(server), mapData(server)), guns = allTroops(client).filter(s => s.bombard);

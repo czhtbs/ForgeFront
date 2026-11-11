@@ -19,7 +19,7 @@ const start = performance.now(); let peakBattle = 0, maxBattles = 0;
 for (let i = 0; i < 30 * 60 * 30 && w.winner === null; i++) {
   stepLocalWorld(w); maxBattles = Math.max(maxBattles, w.battles.length);
   if (i % 300 === 0) {
-    for (const p of w.provinces) { assert.ok(p.troops.length <= 60); assert.ok(p.hp >= 0 && p.hp <= 1000); }
+    for (const p of w.provinces) { assert.ok(p.troops.length <= 60); assert.ok(p.hp >= 0 && p.hp <= 3000); }
     assert.ok(w.factions.every(f => f.gold >= 0));
     for (const b of w.battles) { peakBattle = Math.max(peakBattle, b.fighters.length); assert.ok(b.fighters.length <= 240); }
     const units = [...w.provinces.flatMap(p => [...p.troops, ...p.mobile]), ...w.shipments.flatMap(s => s.troops), ...w.battles.flatMap(b => [...b.fighters, ...b.reserve])];
